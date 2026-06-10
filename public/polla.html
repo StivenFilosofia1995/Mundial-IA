@@ -453,9 +453,29 @@ document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
 sb.channel('resultados-live')
   .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, payload => {
     if (payload.new) RESULTADOS[payload.new.partido_id] = { gl: payload.new.goles_local, gv: payload.new.goles_vis };
+    // Actualiza apuestas si ese tab está activo
     if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
+    // Actualiza tabla si está activa, o marca que hay cambios pendientes
+    if (document.querySelector('[data-tab="tabla"].on')) {
+      renderBoard();
+    } else {
+      // Muestra badge "nuevo resultado" en el tab tabla
+      const tabBtn = document.querySelector('[data-tab="tabla"]');
+      if (tabBtn && !tabBtn.querySelector('.badge')) {
+        const b = document.createElement('span');
+        b.className = 'badge';
+        b.style.cssText = 'display:inline-block;width:8px;height:8px;background:var(--rojo);border-radius:50%;margin-left:6px;animation:livepulse 1s infinite';
+        tabBtn.appendChild(b);
+      }
+    }
   })
   .subscribe();
+
+// Quitar badge al abrir la tabla
+document.querySelector('[data-tab="tabla"]').addEventListener('click', () => {
+  const b = document.querySelector('[data-tab="tabla"] .badge');
+  if (b) b.remove();
+});
 
 init();
 </script>

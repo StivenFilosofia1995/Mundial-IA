@@ -92,6 +92,10 @@ CREATE POLICY "anon_all_apuestas"    ON apuestas    FOR ALL TO anon USING (true)
 CREATE POLICY "anon_all_resultados"  ON resultados  FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_asistencias" ON asistencias FOR ALL TO anon USING (true) WITH CHECK (true);
 
+-- CRÍTICO: dar acceso a la vista al rol anon (sin esto la tabla de posiciones no carga)
+GRANT SELECT ON v_tabla TO anon;
+GRANT SELECT ON v_tabla TO authenticated;
+
 -- 5. VISTA: TABLA DE POSICIONES
 -- ============================================================
 CREATE OR REPLACE VIEW v_tabla AS
