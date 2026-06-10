@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA POLLA NODO — Mundial 2026</title>
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --nodo:#001166;
+  --nodo-mid:#0022aa;
+  --amarillo:#FCD116;
+  --rojo:#CE1126;
+  --blanco:#ffffff;
+  --paper:#f4f6fb;
+  --card:#ffffff;
+  --grey:#6b7280;
+  --ink:#0a0e1a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif;
+  background-image:repeating-linear-gradient(0deg,transparent,transparent 27px,rgba(0,17,102,.03) 27px,rgba(0,17,102,.03) 28px)}
+/* TRICOLOR */
+.tricolor{height:5px;background:linear-gradient(90deg,var(--amarillo) 0 40%,var(--nodo) 40% 70%,var(--rojo) 70% 100%)}
+/* HEADER */
+header{background:var(--nodo);color:var(--blanco);padding:16px 4vw;display:flex;flex-wrap:wrap;align-items:center;gap:12px;border-bottom:4px solid var(--amarillo)}
+.nodo-logo{display:flex;align-items:center;gap:12px}
+.nodo-icon{width:40px;height:40px;background:var(--blanco);border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none}
+.nodo-icon svg{width:26px;height:26px}
+.nodo-text .nodo-name{font-family:'Archivo Black',sans-serif;font-size:18px;letter-spacing:.12em;color:var(--blanco);text-transform:uppercase;line-height:1}
+.nodo-text .nodo-name sup{font-size:9px;vertical-align:super}
+.nodo-text .nodo-eafit{font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.5);font-family:'Spline Sans Mono',monospace}
+.head-title{font-family:'Archivo Black',sans-serif;font-size:clamp(18px,3vw,28px);color:var(--blanco);letter-spacing:-.01em;margin-left:4px}
+.head-title em{font-style:normal;color:var(--amarillo)}
+.head-meta{margin-left:auto;text-align:right;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);line-height:1.7}
+.head-meta b{color:var(--amarillo)}
+.user-chip{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.user-name{font-family:'Spline Sans Mono',monospace;font-size:11px;color:rgba(255,255,255,.75);background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);padding:6px 12px;border-radius:20px}
+.btn-logout{font-family:'Spline Sans Mono',monospace;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;background:var(--rojo);color:var(--blanco);border:2px solid rgba(255,255,255,.4);padding:7px 14px;cursor:pointer;border-radius:3px;transition:all .15s}
+.btn-logout:hover{background:#a50e1e;border-color:var(--blanco)}
+/* NAV */
+nav{display:flex;flex-wrap:wrap;border-bottom:3px solid var(--nodo);background:var(--blanco);position:sticky;top:0;z-index:40;box-shadow:0 2px 8px rgba(0,17,102,.1)}
+nav button{font-family:'Archivo',sans-serif;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.04em;background:transparent;border:none;border-right:1px solid rgba(0,17,102,.12);padding:13px 20px;cursor:pointer;color:var(--grey);transition:all .15s}
+nav button.on{background:var(--nodo);color:var(--amarillo)}
+nav button:hover:not(.on){background:var(--paper);color:var(--nodo)}
+/* MAIN */
+main{padding:24px 4vw 90px;max-width:1240px;margin:0 auto}
+.tab{display:none}.tab.on{display:block}
+h2{font-family:'Archivo Black',sans-serif;font-size:24px;color:var(--nodo);margin-bottom:4px}
+.note{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);margin-bottom:16px;letter-spacing:.06em;text-transform:uppercase}
+/* BUTTONS */
+.btn{font-family:'Spline Sans Mono',monospace;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;
+  border:2px solid var(--nodo);background:var(--card);color:var(--nodo);padding:8px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--nodo);transition:all .1s}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--nodo)}
+.btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--nodo)}
+.btn.primary{background:var(--amarillo)}
+.btn.danger{background:var(--rojo);border-color:var(--rojo);color:var(--blanco);box-shadow:3px 3px 0 rgba(0,0,0,.3)}
+.btn.blue{background:var(--nodo);color:var(--blanco)}
+input[type="number"],input[type="text"],select{font-family:'Spline Sans Mono',monospace;font-size:12px;border:2px solid var(--nodo);padding:8px 10px;background:var(--card);color:var(--ink);border-radius:0;outline:none}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px}
+/* FLAGS */
+.flag{width:28px;height:20px;object-fit:cover;border:1px solid rgba(0,17,102,.2);flex:none;border-radius:1px}
+.flag-tbd{width:28px;height:20px;border:1px dashed var(--grey);display:inline-flex;align-items:center;justify-content:center;font-size:7px;flex:none;background:#e8eaf0;color:var(--grey)}
+/* BET CARDS */
+.bets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.bet-card{background:var(--card);border:2px solid var(--nodo);box-shadow:3px 3px 0 var(--nodo);padding:14px;transition:all .1s}
+.bet-card:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--nodo)}
+.bet-card.locked{opacity:.5;background:#edf0f8;pointer-events:none}
+.bet-card.saving{border-color:var(--amarillo);box-shadow:3px 3px 0 var(--amarillo)}
+.bet-top{display:flex;justify-content:space-between;font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--grey);margin-bottom:10px}
+.bet-top .stage{background:var(--nodo);color:var(--blanco);padding:2px 7px;font-size:9px}
+.bet-teams{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bt{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;min-width:0;flex:1}
+.bt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt.right{flex-direction:row-reverse;text-align:right}
+.score-in{width:44px;text-align:center;font-family:'Archivo Black',sans-serif;font-size:20px;padding:5px 2px;border:2px solid var(--nodo);background:var(--paper);flex:none}
+.score-in:disabled{background:#e8eaf0;border-color:#c0c8e0}
+.score-sep{font-family:'Archivo Black',sans-serif;font-size:20px;color:var(--grey);flex:none;padding:0 2px}
+.bet-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);border-top:1px solid rgba(0,17,102,.08);padding-top:8px}
+.pts-chip{font-family:'Spline Sans Mono',monospace;font-size:10px;font-weight:600;padding:2px 10px;border:2px solid var(--nodo)}
+.pts-3{background:var(--amarillo);color:var(--nodo)}.pts-1{background:var(--nodo);color:var(--blanco)}.pts-0{background:#e8eaf0;color:var(--grey)}
+/* TABLA */
+table{width:100%;border-collapse:collapse;background:var(--card);border:2px solid var(--nodo);box-shadow:5px 5px 0 var(--nodo)}
+th,td{border-bottom:1px solid rgba(0,17,102,.1);padding:12px 14px;text-align:left}
+th{font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.16em;background:var(--nodo);color:var(--blanco)}
+td.num,th.num{text-align:right;font-family:'Spline Sans Mono',monospace}
+tr.podio-1 td:first-child{box-shadow:inset 5px 0 0 var(--amarillo)}
+tr.podio-2 td:first-child{box-shadow:inset 5px 0 0 var(--nodo-mid)}
+tr.podio-3 td:first-child{box-shadow:inset 5px 0 0 var(--rojo)}
+tr.yo{background:#f0f3ff}
+.big-pts{font-family:'Archivo Black',sans-serif;font-size:22px;color:var(--nodo)}
+/* COLOMBIA */
+.co-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.co-card{background:var(--card);border:3px solid var(--nodo);box-shadow:6px 6px 0 var(--amarillo);overflow:hidden}
+.co-band{height:8px;background:linear-gradient(90deg,var(--amarillo) 0 40%,var(--nodo) 40% 70%,var(--rojo) 70% 100%)}
+.co-body{padding:18px}
+.co-vs{display:flex;align-items:center;gap:10px;font-family:'Archivo Black',sans-serif;font-size:18px;flex-wrap:wrap}
+.co-when{font-family:'Spline Sans Mono',monospace;font-size:11px;margin:10px 0 4px;color:var(--nodo);font-weight:600}
+.co-where{font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--grey);text-transform:uppercase;letter-spacing:.1em}
+.co-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.attendees{margin-top:12px;border-top:1px dashed rgba(0,17,102,.2);padding-top:10px}
+.attendees b{font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--nodo)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:'Spline Sans Mono',monospace;font-size:10px;background:var(--paper);border:1.5px solid var(--nodo);padding:3px 10px;border-radius:20px;color:var(--nodo)}
+/* INTEGRANTES */
+.member-card{background:var(--card);border:2px solid var(--nodo);padding:14px 16px;box-shadow:3px 3px 0 var(--nodo);display:flex;align-items:center;gap:12px}
+.member-avatar{width:36px;height:36px;background:var(--nodo);color:var(--blanco);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Archivo Black',sans-serif;font-size:14px;flex:none}
+.warn{background:#fffbeb;border:2px solid var(--amarillo);padding:10px 14px;font-size:12px;margin:12px 0;color:var(--ink)}
+.loading{text-align:center;padding:40px;font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--grey)}
+footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:16px 4vw;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media(max-width:600px){nav button{flex:1;padding:11px 6px;font-size:11px}.head-meta,.head-title{display:none}}
+</style>
+</head>
+<body>
+<div class="tricolor"></div>
+<header>
+  <div class="nodo-logo">
+    <div class="nodo-icon">
+      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="30" height="30" fill="#001166" rx="2"/>
+        <path d="M6 22V8h3.6l8.4 9.6V8H22v14h-3.6L10 12.4V22H6z" fill="white"/>
+      </svg>
+    </div>
+    <div class="nodo-text">
+      <div class="nodo-name">NODO<sup>^</sup></div>
+      <div class="nodo-eafit">UNIVERSIDAD EAFIT</div>
+    </div>
+  </div>
+  <span class="head-title">LA <em>POLLA</em> 2026</span>
+  <div class="head-meta">
+    104 PARTIDOS · <b>EXACTO 3 PTS</b> · <b>ACIERTO 1 PT</b><br>HORA COLOMBIANA (UTC–5)
+  </div>
+  <div id="userChip" class="user-chip" style="display:none">
+    <span class="user-name" id="userLabel">…</span>
+    <button class="btn-logout" onclick="cerrarSesion()">⏻ Cerrar sesión</button>
+  </div>
+</header>
+
+<nav>
+  <button class="on" data-tab="apuestas">⚽ Apuestas</button>
+  <button data-tab="tabla">🏆 Tabla</button>
+  <button data-tab="colombia">🇨🇴 Colombia</button>
+  <button data-tab="resultados">📋 Resultados</button>
+  <button data-tab="integrantes">👥 Integrantes</button>
+</nav>
+
+<main>
+
+<!-- APUESTAS: los 104 partidos -->
+<section class="tab on" id="tab-apuestas">
+  <h2>Mis apuestas</h2>
+  <p class="note">PREDICE EL MARCADOR DE LOS 104 PARTIDOS. SE BLOQUEA AL INICIO DEL PARTIDO. SE GUARDAN AUTOMÁTICAMENTE.</p>
+  <div class="row">
+    <select id="betStage"><option value="">TODAS LAS FASES</option></select>
+    <button class="btn blue" onclick="location.href='/dashboard.html'">📅 Calendario</button>
+  </div>
+  <div id="betsGrid" class="bets-grid"><div class="loading">Cargando partidos…</div></div>
+</section>
+
+<!-- TABLA -->
+<section class="tab" id="tab-tabla">
+  <h2>Tabla de posiciones</h2>
+  <p class="note">3 PTS EXACTO · 1 PT GANADOR/EMPATE · SE RECALCULA SOLO CUANDO SE INGRESA UN RESULTADO.</p>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:monospace;font-size:11px;color:var(--grey)">
+    <span style="width:8px;height:8px;background:var(--rojo);border-radius:50%;display:inline-block;animation:livepulse 1.4s infinite"></span>
+    EN VIVO — la tabla se actualiza en tiempo real para todos
+  </div>
+  <style>@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.2}}</style>
+  <div id="board"><div class="loading">Cargando tabla…</div></div>
+</section>
+
+<!-- COLOMBIA -->
+<section class="tab" id="tab-colombia">
+  <h2>Partidos de Colombia 🇨🇴</h2>
+  <p class="note">AGENDA LOS PARTIDOS Y ANÓTATE PARA VERLOS CON LA OFICINA.</p>
+  <div class="co-grid" id="coGrid"><div class="loading">Cargando…</div></div>
+</section>
+
+<!-- RESULTADOS (admin) -->
+<section class="tab" id="tab-resultados">
+  <h2>Resultados oficiales</h2>
+  <p class="note">INGRESA EL MARCADOR FINAL — LA TABLA SE RECALCULA AUTOMÁTICAMENTE.</p>
+  <div class="row"><select id="resStage"><option value="">TODAS LAS FASES</option></select></div>
+  <div class="bets-grid" id="resGrid"><div class="loading">Cargando…</div></div>
+</section>
+
+<!-- INTEGRANTES -->
+<section class="tab" id="tab-integrantes">
+  <h2>Integrantes</h2>
+  <p class="note">TODOS LOS REGISTRADOS EN LA POLLA.</p>
+  <div class="bets-grid" id="memberList"><div class="loading">Cargando…</div></div>
+</section>
+
+</main>
+<footer>
+  <span>LA POLLA NODO · MUNDIAL 2026 · UNIVERSIDAD EAFIT</span>
+  <span>HECHO EN LA OFICINA ☕</span>
+</footer>
+
+<script>
+const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const sesion = JSON.parse(localStorage.getItem('polla-sesion') || 'null');
+if (!sesion) { window.location.href = '/'; }
+
+document.getElementById('userChip').style.display = 'flex';
+document.getElementById('userLabel').textContent = sesion.nombre + ' ' + sesion.apellido;
+window.cerrarSesion = () => { localStorage.removeItem('polla-sesion'); window.location.href = '/'; };
+
+const $ = id => document.getElementById(id);
+const DAYS = ['dom','lun','mar','mié','jue','vie','sáb'];
+const flag  = (c,l) => c ? `<img class="flag" src="https://flagcdn.com/w80/${c}.png" alt="${l}">` : `<div class="flag-tbd">${(l||'').slice(0,3)||'?'}</div>`;
+const started = m => new Date(m.fecha+'T'+m.hora+':00-05:00') <= new Date();
+const fmtWhen = m => { const d=new Date(m.fecha+'T12:00:00-05:00'); return `${DAYS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1} · ${m.hora}`; };
+
+let MATCHES = [], RESULTADOS = {}, APUESTAS_CACHE = {};
+
+function points(bet, res) {
+  if (!bet||!res||bet.gl==null||bet.gv==null) return null;
+  const bh=+bet.gl,ba=+bet.gv,rh=+res.gl,ra=+res.gv;
+  if (bh===rh&&ba===ra) return 3;
+  if (Math.sign(bh-ba)===Math.sign(rh-ra)) return 1;
+  return 0;
+}
+
+const pad = n => String(n).padStart(2,'0');
+function downloadIcs(m) {
+  const [y,mo,d]=m.fecha.split('-').map(Number),[h,mi]=m.hora.split(':').map(Number);
+  const s=new Date(Date.UTC(y,mo-1,d,h+5,mi)),e=new Date(s.getTime()+72e5);
+  const f=t=>t.getUTCFullYear()+pad(t.getUTCMonth()+1)+pad(t.getUTCDate())+'T'+pad(t.getUTCHours())+pad(t.getUTCMinutes())+'00Z';
+  const txt=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//nodo//WC26//ES','BEGIN:VEVENT',
+    `UID:polla-wc2026-m${m.id}@nodo`,`DTSTAMP:${f(new Date())}`,`DTSTART:${f(s)}`,`DTEND:${f(e)}`,
+    `SUMMARY:⚽ ${m.local} vs ${m.visitante} — ${m.etapa} (Polla NODO)`,
+    `LOCATION:${m.estadio}, ${m.ciudad}`,`DESCRIPTION:Mundial 2026 · ${m.hora} hora Colombia · Polla NODO`,
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Partido en 30 min','TRIGGER:-PT30M','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));
+  a.download=`M${m.id}_${m.local}_vs_${m.visitante}.ics`.replace(/\s+/g,'_'); a.click();
+}
+window.downloadIcs = downloadIcs;
+
+// ── INIT ────────────────────────────────────────────
+async function init() {
+  const [{ data: partidos },{ data: resultados },{ data: apuestas }] = await Promise.all([
+    sb.from('partidos').select('*').order('fecha').order('hora'),
+    sb.from('resultados').select('*'),
+    sb.from('apuestas').select('*').eq('usuario_id', sesion.id)
+  ]);
+
+  MATCHES = partidos || [];
+  RESULTADOS = {};
+  (resultados||[]).forEach(r => { RESULTADOS[r.partido_id] = { gl: r.goles_local, gv: r.goles_vis }; });
+  APUESTAS_CACHE = {};
+  (apuestas||[]).forEach(a => { APUESTAS_CACHE[a.partido_id] = { gl: a.goles_local, gv: a.goles_vis }; });
+
+  const etapas = [...new Set(MATCHES.map(m => m.etapa))];
+  for (const sel of [$('betStage'), $('resStage')]) {
+    sel.innerHTML = '<option value="">TODAS LAS FASES</option>' +
+      etapas.map(e => `<option value="${e}">${e.toUpperCase()}</option>`).join('');
+  }
+  renderBets();
+}
+
+// ── APUESTAS (104 partidos) ──────────────────────────
+function renderBets() {
+  const st = $('betStage').value;
+  const list = MATCHES.filter(m => !st || m.etapa === st);
+  $('betsGrid').innerHTML = list.map(m => {
+    const lock = started(m);
+    const bet  = APUESTAS_CACHE[m.id] || { gl: '', gv: '' };
+    const res  = RESULTADOS[m.id];
+    const p    = res ? points(bet, res) : null;
+    return `<div class="bet-card ${lock?'locked':''}" id="card-${m.id}">
+      <div class="bet-top">
+        <span class="stage">${m.etapa}</span>
+        <span>P${m.id} · ${fmtWhen(m)}</span>
+      </div>
+      <div class="bet-teams">
+        <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
+        <input class="score-in" type="number" min="0" max="20"
+          value="${bet.gl!=null&&bet.gl!==''?bet.gl:''}" ${lock?'disabled':''}
+          data-m="${m.id}" data-s="gl">
+        <span class="score-sep">–</span>
+        <input class="score-in" type="number" min="0" max="20"
+          value="${bet.gv!=null&&bet.gv!==''?bet.gv:''}" ${lock?'disabled':''}
+          data-m="${m.id}" data-s="gv">
+        <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
+      </div>
+      <div class="bet-bottom">
+        <span>${res?`RESULTADO: ${res.gl}–${res.gv}`:(lock?'⏱ EN JUEGO':'ABIERTO')}</span>
+        ${p!==null?`<span class="pts-chip pts-${p}">${p} PTS</span>`:''}
+      </div></div>`;
+  }).join('') || '<div class="loading">Sin partidos en esta fase.</div>';
+}
+
+const saveTimers = {};
+$('betsGrid').addEventListener('input', e => {
+  const inp = e.target; if (!inp.dataset.m) return;
+  const mid = +inp.dataset.m;
+  APUESTAS_CACHE[mid] = APUESTAS_CACHE[mid] || { gl: null, gv: null };
+  APUESTAS_CACHE[mid][inp.dataset.s] = inp.value !== '' ? +inp.value : null;
+  const card = document.getElementById('card-'+mid);
+  if (card) card.classList.add('saving');
+  clearTimeout(saveTimers[mid]);
+  saveTimers[mid] = setTimeout(() => saveApuesta(mid), 600);
+});
+
+async function saveApuesta(mid) {
+  const bet = APUESTAS_CACHE[mid];
+  if (bet.gl == null || bet.gv == null) return;
+  await sb.from('apuestas').upsert({
+    usuario_id: sesion.id, partido_id: mid,
+    goles_local: bet.gl, goles_vis: bet.gv,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'usuario_id,partido_id' });
+  const card = document.getElementById('card-'+mid);
+  if (card) card.classList.remove('saving');
+}
+$('betStage').onchange = renderBets;
+
+// ── RESULTADOS (admin) ──────────────────────────────
+function renderRes() {
+  const st = $('resStage').value;
+  const list = MATCHES.filter(m => !st || m.etapa === st);
+  $('resGrid').innerHTML = list.map(m => {
+    const r = RESULTADOS[m.id] || { gl: '', gv: '' };
+    return `<div class="bet-card">
+      <div class="bet-top"><span class="stage">${m.etapa}</span><span>P${m.id} · ${fmtWhen(m)}</span></div>
+      <div class="bet-teams">
+        <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
+        <input class="score-in" type="number" min="0" max="20"
+          value="${r.gl!=null&&r.gl!==''?r.gl:''}" data-m="${m.id}" data-s="gl">
+        <span class="score-sep">–</span>
+        <input class="score-in" type="number" min="0" max="20"
+          value="${r.gv!=null&&r.gv!==''?r.gv:''}" data-m="${m.id}" data-s="gv">
+        <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
+      </div></div>`;
+  }).join('');
+}
+
+const resTimers = {};
+$('resGrid').addEventListener('input', e => {
+  const inp = e.target; if (!inp.dataset.m) return;
+  const mid = +inp.dataset.m;
+  RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null };
+  RESULTADOS[mid][inp.dataset.s] = inp.value !== '' ? +inp.value : null;
+  clearTimeout(resTimers[mid]);
+  resTimers[mid] = setTimeout(() => saveResultado(mid), 800);
+});
+
+async function saveResultado(mid) {
+  const r = RESULTADOS[mid];
+  if (r.gl == null || r.gv == null) return;
+  await sb.from('resultados').upsert({
+    partido_id: mid, goles_local: r.gl, goles_vis: r.gv, updated_at: new Date().toISOString()
+  }, { onConflict: 'partido_id' });
+}
+$('resStage').onchange = renderRes;
+
+// ── TABLA ──────────────────────────────────────────
+async function renderBoard() {
+  const { data } = await sb.from('v_tabla').select('*');
+  $('board').innerHTML = (data||[]).length
+    ? `<table><tr><th>#</th><th>Participante</th><th class="num">Exactos</th><th class="num">Aciertos</th><th class="num">Evaluados</th><th class="num">Puntos</th></tr>`+
+      (data||[]).map((r,i) =>
+        `<tr class="${i<3?'podio-'+(i+1):''} ${r.id===sesion.id?'yo':''}">
+          <td>${i+1}</td><td><b>${r.nombre_completo}</b>${r.id===sesion.id?' <small style="font-size:10px;color:var(--grey)">(tú)</small>':''}</td>
+          <td class="num">${r.exactos||0}</td><td class="num">${r.aciertos||0}</td>
+          <td class="num">${r.evaluados||0}</td><td class="num big-pts">${r.puntos||0}</td></tr>`
+      ).join('')+'</table>'
+    : '<div class="warn">Aún no hay participantes con apuestas evaluadas.</div>';
+}
+
+// ── COLOMBIA ──────────────────────────────────────
+async function renderCo() {
+  const cos = MATCHES.filter(m => m.codigo_local==='co' || m.codigo_vis==='co');
+  const ids  = cos.map(m => m.id);
+  const { data: asis } = await sb
+    .from('asistencias')
+    .select('id,usuario_id,partido_id,usuarios(nombre,apellido)')
+    .in('partido_id', ids);
+
+  const asisMap = {};
+  (asis||[]).forEach(a => {
+    (asisMap[a.partido_id] = asisMap[a.partido_id]||[]).push({
+      id: a.id, usuario_id: a.usuario_id,
+      nombre: a.usuarios.nombre + ' ' + a.usuarios.apellido
+    });
+  });
+
+  $('coGrid').innerHTML = cos.map(m => {
+    const reg = asisMap[m.id] || [];
+    const yaApuntado = reg.some(a => a.usuario_id === sesion.id);
+    return `<div class="co-card">
+      <div class="co-band"></div>
+      <div class="co-body">
+        <div class="co-vs">${flag(m.codigo_local,m.local)} ${m.local} <span style="color:var(--grey);font-size:14px">vs</span> ${m.visitante} ${flag(m.codigo_vis,m.visitante)}</div>
+        <div class="co-when">📅 ${fmtWhen(m)} (hora COL)</div>
+        <div class="co-where">📍 ${m.estadio} · ${m.ciudad} · ${m.etapa}</div>
+        <div class="co-actions" style="flex-direction:column;gap:8px">
+          <button class="btn primary" style="font-size:13px;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%" onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}))">
+            📆 Agendar en Outlook / Teams / Google
+          </button>
+          ${!yaApuntado
+            ? `<button class="btn blue" style="font-size:13px;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%" onclick="toggleAsis(${m.id},true)">✋ Me apunto a verlo con la oficina</button>`
+            : `<button class="btn danger" style="font-size:13px;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%" onclick="toggleAsis(${m.id},false)">✗ Borrarme de la lista</button>`}
+        </div>
+        <div class="attendees">
+          <b>SE APUNTAN (${reg.length})</b>
+          <div class="chips">${reg.map(a=>`<span class="chip">${a.nombre}</span>`).join('') || '<span style="font-size:10px;color:var(--grey);font-family:monospace">— nadie aún —</span>'}</div>
+        </div>
+      </div></div>`;
+  }).join('');
+}
+
+window.toggleAsis = async (pid, add) => {
+  if (add) await sb.from('asistencias').upsert({ usuario_id: sesion.id, partido_id: pid }, { onConflict: 'usuario_id,partido_id' });
+  else     await sb.from('asistencias').delete().eq('usuario_id', sesion.id).eq('partido_id', pid);
+  renderCo();
+};
+
+// ── INTEGRANTES ──────────────────────────────────
+async function renderMembers() {
+  const { data } = await sb.from('usuarios').select('id,nombre,apellido,created_at').order('apellido');
+  $('memberList').innerHTML = (data||[]).map(u => {
+    const ini = (u.nombre[0]||'') + (u.apellido[0]||'');
+    const esYo = u.id === sesion.id;
+    return `<div class="member-card" ${esYo?'style="border-color:var(--amarillo);box-shadow:3px 3px 0 var(--amarillo)"':''}>
+      <div class="member-avatar">${ini.toUpperCase()}</div>
+      <div>
+        <div style="font-weight:700;font-size:15px">${u.nombre} ${u.apellido} ${esYo?'<small style="font-size:11px;color:var(--grey)">(tú)</small>':''}</div>
+        <div style="font-family:monospace;font-size:10px;color:var(--grey)">Registrado ${new Date(u.created_at).toLocaleDateString('es-CO')}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="warn">Sin integrantes registrados.</div>';
+}
+
+// ── TABS ──────────────────────────────────────────
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button,.tab').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.getElementById('tab-'+b.dataset.tab).classList.add('on');
+  const t = b.dataset.tab;
+  if      (t==='tabla')       renderBoard();
+  else if (t==='colombia')    renderCo();
+  else if (t==='resultados')  renderRes();
+  else if (t==='integrantes') renderMembers();
+  else                        renderBets();
+});
+
+// ── REALTIME: resultados en vivo ──────────────────
+sb.channel('resultados-live')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, payload => {
+    if (payload.new) RESULTADOS[payload.new.partido_id] = { gl: payload.new.goles_local, gv: payload.new.goles_vis };
+    if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
+  })
+  .subscribe();
+
+init();
+</script>
+</body>
+</html>

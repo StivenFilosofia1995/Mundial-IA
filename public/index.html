@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LA POLLA NODO — Mundial 2026</title>
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --nodo:#001166;       /* azul marino NODO */
+  --nodo-mid:#002299;   /* azul medio */
+  --amarillo:#FCD116;
+  --rojo:#CE1126;
+  --blanco:#ffffff;
+  --paper:#f4f6fb;
+  --card:#ffffff;
+  --grey:#6b7280;
+  --ink:#0a0e1a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+/* TRICOLOR COLOMBIA */
+.tricolor{height:5px;background:linear-gradient(90deg,var(--amarillo) 0 40%,var(--nodo) 40% 70%,var(--rojo) 70% 100%)}
+/* HEADER */
+header{background:var(--nodo);color:var(--blanco);padding:22px 5vw;border-bottom:4px solid var(--amarillo);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+.nodo-logo{display:flex;align-items:center;gap:14px}
+.nodo-icon{width:48px;height:48px;background:var(--blanco);border-radius:4px;display:flex;align-items:center;justify-content:center;flex:none}
+.nodo-icon svg{width:30px;height:30px}
+.nodo-text{display:flex;flex-direction:column;gap:1px}
+.nodo-name{font-family:'Archivo Black',sans-serif;font-size:22px;letter-spacing:.12em;color:var(--blanco);text-transform:uppercase;line-height:1}
+.nodo-name sup{font-size:10px;vertical-align:super;letter-spacing:0}
+.nodo-eafit{font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.6);font-family:'Spline Sans Mono',monospace}
+.head-right{text-align:right;font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.6);line-height:1.6}
+.head-right b{color:var(--amarillo)}
+/* HERO */
+.hero{background:var(--nodo);color:var(--blanco);padding:40px 5vw 50px;text-align:center;position:relative;overflow:hidden}
+.hero::after{content:'⚽';position:absolute;right:-20px;bottom:-30px;font-size:180px;opacity:.04}
+.hero h1{font-family:'Archivo Black',sans-serif;font-size:clamp(32px,6vw,72px);letter-spacing:-.02em;line-height:.95}
+.hero h1 em{font-style:normal;color:var(--amarillo)}
+.hero .sub{font-family:'Spline Sans Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:12px}
+main{flex:1;padding:40px 5vw;background:var(--paper)}
+.main-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:900px;margin:0 auto;align-items:start}
+@media(max-width:700px){.main-grid{grid-template-columns:1fr}}
+.dash-card{background:var(--nodo);border:2px solid var(--nodo);box-shadow:6px 6px 0 var(--amarillo);padding:36px;color:var(--blanco)}
+.dash-card h2{font-family:'Archivo Black',sans-serif;font-size:20px;color:var(--amarillo);margin-bottom:6px}
+.dash-card .note{font-family:'Spline Sans Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);margin-bottom:24px;letter-spacing:.06em;text-transform:uppercase}
+.dash-features{list-style:none;margin-bottom:28px;display:flex;flex-direction:column;gap:10px}
+.dash-features li{font-size:13px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:10px}
+.dash-features li::before{content:'';width:8px;height:8px;background:var(--amarillo);flex:none;border-radius:50%}
+.btn-dash{font-family:'Spline Sans Mono',monospace;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+  border:2px solid var(--amarillo);background:var(--amarillo);color:var(--nodo);padding:14px 20px;cursor:pointer;
+  box-shadow:4px 4px 0 rgba(255,255,255,.3);transition:all .1s;width:100%;display:block;text-align:center;text-decoration:none}
+.btn-dash:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 rgba(255,255,255,.4)}
+/* CARD */
+.card{background:var(--card);border:2px solid var(--nodo);box-shadow:6px 6px 0 var(--nodo);padding:36px;width:100%;max-width:440px}
+.card h2{font-family:'Archivo Black',sans-serif;font-size:20px;color:var(--nodo);margin-bottom:4px}
+.card .note{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);margin-bottom:22px;letter-spacing:.06em;text-transform:uppercase}
+label{display:block;font-family:'Spline Sans Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.12em;margin-bottom:5px;font-weight:600;color:var(--ink)}
+input,select{font-family:'Spline Sans Mono',monospace;font-size:13px;border:2px solid var(--nodo);padding:10px 12px;background:var(--card);color:var(--ink);border-radius:0;outline:none;width:100%;display:block;margin-bottom:14px;transition:border-color .15s}
+input:focus,select:focus{border-color:var(--nodo-mid);box-shadow:0 0 0 3px rgba(0,17,102,.1)}
+.btn{font-family:'Spline Sans Mono',monospace;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;
+  border:2px solid var(--nodo);background:var(--amarillo);color:var(--nodo);padding:12px 20px;cursor:pointer;
+  box-shadow:4px 4px 0 var(--nodo);transition:all .1s;width:100%;display:block}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--nodo)}
+.btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--nodo)}
+.btn.secondary{background:var(--card);color:var(--nodo);margin-top:10px}
+.btn.secondary:hover{background:var(--paper)}
+.divider{text-align:center;font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);margin:18px 0;position:relative;letter-spacing:.08em}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:38%;height:1px;background:rgba(0,17,102,.15)}
+.divider::before{left:0}.divider::after{right:0}
+.error{background:#fef2f2;color:#b91c1c;border:2px solid #b91c1c;padding:10px 14px;font-family:'Spline Sans Mono',monospace;font-size:11px;margin-bottom:14px;display:none}
+.success{background:#f0fdf4;color:#15803d;border:2px solid #15803d;padding:10px 14px;font-family:'Spline Sans Mono',monospace;font-size:11px;margin-bottom:14px;display:none}
+.nav-links{display:flex;gap:14px;margin-top:22px;justify-content:center}
+.nav-links a{font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--nodo);text-decoration:none;border-bottom:2px solid var(--amarillo);padding-bottom:1px}
+.nav-links a:hover{background:var(--nodo);color:var(--blanco);border-color:var(--nodo);padding:1px 6px}
+footer{background:var(--nodo);color:rgba(255,255,255,.45);padding:14px 5vw;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+</style>
+</head>
+<body>
+<div class="tricolor"></div>
+<header>
+  <div class="nodo-logo">
+    <!-- NODO icon: "n" blanco sobre fondo blanco, forma cuadrada azul -->
+    <div class="nodo-icon">
+      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="30" height="30" fill="#001166" rx="2"/>
+        <path d="M6 22V8h3.6l8.4 9.6V8H22v14h-3.6L10 12.4V22H6z" fill="white"/>
+      </svg>
+    </div>
+    <div class="nodo-text">
+      <div class="nodo-name">NODO<sup>^</sup></div>
+      <div class="nodo-eafit">UNIVERSIDAD EAFIT</div>
+    </div>
+  </div>
+  <div class="head-right">MUNDIAL 2026 · <b>104 PARTIDOS</b><br>EXACTO <b>3 PTS</b> · ACIERTO <b>1 PT</b></div>
+</header>
+
+<div class="hero">
+  <h1>LA <em>POLLA</em><br>NODO 2026</h1>
+  <div class="sub">MUNDIAL FIFA · 104 PARTIDOS · HORA COLOMBIANA</div>
+</div>
+
+<main>
+  <div class="main-grid">
+
+    <!-- CARD: REGISTRO / LOGIN -->
+    <div class="card">
+      <div id="msgError" class="error"></div>
+      <div id="msgOk"    class="success"></div>
+
+      <div id="formRegistro">
+        <h2>Unirse a la polla</h2>
+        <p class="note">Registra tu nombre y apellido para apostar</p>
+        <label for="regNombre">Nombre</label>
+        <input id="regNombre" type="text" placeholder="ej. Juan" maxlength="60" autocomplete="given-name">
+        <label for="regApellido">Apellido</label>
+        <input id="regApellido" type="text" placeholder="ej. García" maxlength="60" autocomplete="family-name">
+        <button class="btn" id="btnRegistrar">⚽ Unirme a la polla</button>
+        <div class="divider">¿ya te registraste?</div>
+        <button class="btn secondary" id="btnMostrarLogin">Seleccionar mi perfil</button>
+      </div>
+
+      <div id="formLogin" style="display:none">
+        <h2>Seleccionar perfil</h2>
+        <p class="note">Elige tu nombre para entrar</p>
+        <label for="selUsuario">Participante</label>
+        <select id="selUsuario"><option value="">— selecciona tu nombre —</option></select>
+        <button class="btn" id="btnEntrar">🏆 Entrar a la polla</button>
+        <div class="divider">¿eres nuevo?</div>
+        <button class="btn secondary" id="btnMostrarRegistro">Registrarme</button>
+      </div>
+    </div>
+
+    <!-- CARD: VER PARTIDOS (sin registro) -->
+    <div class="dash-card">
+      <h2>📅 Calendario y resultados</h2>
+      <p class="note">Sin registro necesario · acceso libre</p>
+      <ul class="dash-features">
+        <li>Resultados del día en tiempo real</li>
+        <li>Próximos partidos con botón para agendar</li>
+        <li>Calendario completo de los 104 partidos</li>
+        <li>Agrega partidos a Outlook / Teams / Google Calendar</li>
+        <li>Partidos de Colombia destacados 🇨🇴</li>
+      </ul>
+      <a class="btn-dash" href="/dashboard.html">Ver partidos y resultados →</a>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  <span>LA POLLA (NODO) · MUNDIAL 2026</span>
+  <span>UNIVERSIDAD EAFIT ☕</span>
+</footer>
+
+<script>
+const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const showErr = m => { $('msgError').textContent = m; $('msgError').style.display='block'; $('msgOk').style.display='none'; };
+const showOk  = m => { $('msgOk').textContent = m;   $('msgOk').style.display='block'; $('msgError').style.display='none'; };
+const hideMsg = () => { $('msgError').style.display='none'; $('msgOk').style.display='none'; };
+
+// Redirigir si ya hay sesión
+const sesion = JSON.parse(localStorage.getItem('polla-sesion') || 'null');
+if (sesion && sesion.id) window.location.href = '/polla.html';
+
+async function cargarUsuarios() {
+  const { data } = await sb.from('usuarios').select('id,nombre,apellido').order('apellido');
+  const sel = $('selUsuario');
+  sel.innerHTML = '<option value="">— selecciona tu nombre —</option>' +
+    (data||[]).map(u => `<option value="${u.id}">${u.apellido}, ${u.nombre}</option>`).join('');
+}
+cargarUsuarios();
+
+$('btnRegistrar').onclick = async () => {
+  hideMsg();
+  const nombre   = $('regNombre').value.trim();
+  const apellido = $('regApellido').value.trim();
+  if (!nombre || !apellido) { showErr('Ingresa nombre y apellido.'); return; }
+  const { data, error } = await sb.from('usuarios').insert({ nombre, apellido }).select().single();
+  if (error) {
+    showErr(error.code==='23505' ? 'Ese nombre ya está registrado.' : 'Error: '+error.message);
+    return;
+  }
+  localStorage.setItem('polla-sesion', JSON.stringify({ id: data.id, nombre: data.nombre, apellido: data.apellido }));
+  showOk('¡Bienvenido, ' + data.nombre + '! Entrando…');
+  setTimeout(() => { window.location.href = '/polla.html'; }, 900);
+};
+$('regApellido').addEventListener('keydown', e => { if (e.key==='Enter') $('btnRegistrar').click(); });
+
+$('btnEntrar').onclick = () => {
+  const val = $('selUsuario').value;
+  const txt = $('selUsuario').selectedOptions[0]?.text || '';
+  if (!val) { showErr('Selecciona tu nombre.'); return; }
+  const [ap, nom] = txt.split(', ');
+  localStorage.setItem('polla-sesion', JSON.stringify({ id: val, nombre: nom, apellido: ap }));
+  window.location.href = '/polla.html';
+};
+
+$('btnMostrarLogin').onclick = () => { $('formRegistro').style.display='none'; $('formLogin').style.display='block'; hideMsg(); cargarUsuarios(); };
+$('btnMostrarRegistro').onclick = () => { $('formLogin').style.display='none'; $('formRegistro').style.display='block'; hideMsg(); };
+</script>
+</body>
+</html>
