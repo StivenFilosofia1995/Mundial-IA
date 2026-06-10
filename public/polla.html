@@ -86,6 +86,13 @@ input[type="number"],input[type="text"],select{font-family:'Spline Sans Mono',mo
 .goleadores-row{margin-top:7px;font-family:'Spline Sans Mono',monospace;font-size:10px;color:#374151;padding-top:6px;border-top:1px dashed rgba(0,17,102,.15)}
 .live-strip{height:2px;background:linear-gradient(90deg,var(--rojo),transparent);margin-top:8px;animation:livepulse 2s infinite}
 .gol-input{font-family:'Spline Sans Mono',monospace !important;font-size:11px !important;border:1.5px solid rgba(0,17,102,.25) !important;background:#f8f9ff !important;padding:6px 10px !important;width:100%;display:block;margin-top:8px}
+.result-bar{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-top:8px;font-family:'Spline Sans Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.result-bar.exacto{background:var(--amarillo);color:var(--nodo)}
+.result-bar.acierto{background:var(--nodo);color:var(--blanco)}
+.result-bar.fallado{background:#eff0f4;color:var(--grey)}
+.res-official{font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--grey);padding:5px 10px;border-top:1px solid rgba(0,17,102,.08)}
+.summary-bar{grid-column:1/-1;background:var(--nodo);color:var(--blanco);padding:13px 16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-family:'Spline Sans Mono',monospace;font-size:11px;border-left:5px solid var(--amarillo)}
+.summary-bar b{color:var(--amarillo)}
 /* TABLA */
 table{width:100%;border-collapse:collapse;background:var(--card);border:2px solid var(--nodo);box-shadow:5px 5px 0 var(--nodo)}
 th,td{border-bottom:1px solid rgba(0,17,102,.1);padding:12px 14px;text-align:left}
@@ -186,8 +193,11 @@ footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:16px 4vw;font-f
 <!-- RESULTADOS (admin) -->
 <section class="tab" id="tab-resultados">
   <h2>Resultados oficiales</h2>
-  <p class="note">INGRESA EL MARCADOR FINAL — LA TABLA SE RECALCULA AUTOMÁTICAMENTE.</p>
-  <div class="row"><select id="resStage"><option value="">TODAS LAS FASES</option></select></div>
+  <p class="note">INGRESA MARCADOR Y GOLEADORES — SE GUARDA AUTOMÁTICO Y SE ACTUALIZA EN TIEMPO REAL PARA TODOS.</p>
+  <div class="row">
+    <select id="resStage"><option value="">TODAS LAS FASES</option></select>
+    <button class="btn primary" onclick="saveAllResultados()">💾 Guardar todos</button>
+  </div>
   <div class="bets-grid" id="resGrid"><div class="loading">Cargando…</div></div>
 </section>
 
@@ -273,22 +283,66 @@ async function init() {
 function renderBets() {
   const st = $('betStage').value;
   const list = MATCHES.filter(m => !st || m.etapa === st);
-  $('betsGrid').innerHTML = list.map(m => {
+
+  // Resumen global (todos los partidos, no solo el filtro)
+  let sumExactos=0, sumAciertos=0, sumFallados=0, sumEval=0;
+  MATCHES.forEach(m => {
+    const res = RESULTADOS[m.id];
+    const bet = APUESTAS_CACHE[m.id];
+    if (!res || !bet || bet.gl == null || bet.gv == null) return;
+    sumEval++;
+    const p = points(bet, res);
+    if (p===3) sumExactos++; else if (p===1) sumAciertos++; else sumFallados++;
+  });
+  const sumPts   = sumExactos*3 + sumAciertos;
+  const sumPesos = sumExactos*1500 + sumAciertos*500;
+  const summaryHtml = sumEval > 0
+    ? `<div class="summary-bar">
+        <span>📊 <b>${sumEval}</b> evaluados</span>
+        <span>⭐ <b>${sumExactos}</b> exactos</span>
+        <span>✓ <b>${sumAciertos}</b> aciertos</span>
+        <span>✗ <b>${sumFallados}</b> fallados</span>
+        <span style="margin-left:auto;font-size:12px">🏆 <b>${sumPts} PTS · ${fmtPesos(sumPesos)}</b></span>
+       </div>`
+    : '';
+
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  const cards = list.map(m => {
     const lock = started(m);
     const live = isLive(m);
     const bet  = APUESTAS_CACHE[m.id] || { gl: '', gv: '' };
     const res  = RESULTADOS[m.id];
     const p    = res ? points(bet, res) : null;
-    const statusSpan = res
-      ? `RESULTADO: ${res.gl}–${res.gv}`
-      : (live
-          ? `<span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span>`
-          : (lock ? '⏱ Iniciado' : 'ABIERTO'));
-    const ptsMoney = p === 3 ? 1500 : p === 1 ? 500 : 0;
-    return `<div class="bet-card ${lock?'locked':''} ${live?'saving':''}" id="card-${m.id}">
+
+    const diffDays = Math.round((new Date(m.fecha+'T12:00:00-05:00') - new Date(todayStr+'T12:00:00-05:00')) / 86400000);
+    const whenTag  = diffDays === 0 ? ' · <b style="color:var(--rojo)">HOY</b>' : diffDays === 1 ? ' · <b style="color:var(--nodo)">MAÑANA</b>' : '';
+
+    let bottomHtml;
+    if (res) {
+      const pLabel  = p===3 ? '⭐ EXACTO'  : p===1 ? '✓ ACIERTO' : '✗ FALLADO';
+      const pDetail = p===3 ? '3 PTS · $1.500' : p===1 ? '1 PT · $500' : '0 PTS';
+      bottomHtml = `
+        <div class="result-bar ${p===3?'exacto':p===1?'acierto':'fallado'}">
+          <span>${pLabel}</span><span>${pDetail}</span>
+        </div>
+        <div class="res-official">
+          Tu apuesta: <b>${bet.gl!=null?bet.gl:'—'}–${bet.gv!=null?bet.gv:'—'}</b>
+          &nbsp;·&nbsp; Oficial: <b>${res.gl}–${res.gv}</b>
+          ${res.gol ? `&nbsp;·&nbsp; ⚽ ${res.gol}` : ''}
+        </div>`;
+    } else {
+      const statusSpan = live
+        ? `<span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span>`
+        : (lock ? '⏱ Iniciado' : 'ABIERTO');
+      bottomHtml = `
+        <div class="bet-bottom"><span>${statusSpan}</span></div>
+        ${live ? '<div class="live-strip"></div>' : ''}`;
+    }
+
+    return `<div class="bet-card ${lock?'locked':''} ${live&&!res?'saving':''}" id="card-${m.id}">
       <div class="bet-top">
         <span class="stage">${m.etapa}</span>
-        <span>P${m.id} · ${fmtWhen(m)}</span>
+        <span>P${m.id} · ${fmtWhen(m)}${whenTag}</span>
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
@@ -301,14 +355,11 @@ function renderBets() {
           data-m="${m.id}" data-s="gv">
         <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
       </div>
-      <div class="bet-bottom">
-        <span>${statusSpan}</span>
-        ${p!==null?`<span class="pts-chip pts-${p}">${p} PTS${ptsMoney>0?' · '+fmtPesos(ptsMoney):''}</span>`:''}
-      </div>
-      ${res&&res.gol?`<div class="goleadores-row">⚽ ${res.gol}</div>`:''}
-      ${live?'<div class="live-strip"></div>':''}
+      ${bottomHtml}
     </div>`;
   }).join('') || '<div class="loading">Sin partidos en esta fase.</div>';
+
+  $('betsGrid').innerHTML = summaryHtml + cards;
 }
 
 const saveTimers = {};
@@ -342,8 +393,13 @@ function renderRes() {
   const list = MATCHES.filter(m => !st || m.etapa === st);
   $('resGrid').innerHTML = list.map(m => {
     const r = RESULTADOS[m.id] || { gl: '', gv: '', gol: '' };
-    return `<div class="bet-card">
-      <div class="bet-top"><span class="stage">${m.etapa}</span><span>P${m.id} · ${fmtWhen(m)}</span></div>
+    const yaGuardado = r.gl != null && r.gv != null;
+    return `<div class="bet-card" id="res-card-${m.id}" style="${yaGuardado?'border-left:4px solid #15803d':''}">
+      <div class="bet-top">
+        <span class="stage">${m.etapa}</span>
+        <span>P${m.id} · ${fmtWhen(m)}</span>
+        ${yaGuardado?`<button class="btn danger" style="font-size:9px;padding:2px 8px;margin-left:auto" onclick="borrarResultado(${m.id})">🗑 Borrar</button>`:''}
+      </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
         <input class="score-in" type="number" min="0" max="20"
@@ -383,6 +439,26 @@ async function saveResultado(mid) {
   }, { onConflict: 'partido_id' });
 }
 $('resStage').onchange = renderRes;
+
+window.saveAllResultados = async () => {
+  // Flush all pending timers
+  const mids = Object.keys(resTimers).map(Number);
+  for (const mid of mids) { clearTimeout(resTimers[mid]); delete resTimers[mid]; }
+  // Save anything with values
+  const jobs = Object.entries(RESULTADOS)
+    .filter(([,r]) => r.gl != null && r.gv != null)
+    .map(([mid]) => saveResultado(+mid));
+  await Promise.all(jobs);
+  renderRes();
+};
+
+window.borrarResultado = async (mid) => {
+  if (!confirm('¿Borrar el resultado del partido ' + mid + '? Esto quitará los puntos calculados para ese partido.')) return;
+  await sb.from('resultados').delete().eq('partido_id', mid);
+  delete RESULTADOS[mid];
+  renderRes();
+  renderBets();
+};
 
 // ── TABLA ──────────────────────────────────────────
 async function renderBoard() {
