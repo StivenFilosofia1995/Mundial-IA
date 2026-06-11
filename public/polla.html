@@ -498,6 +498,9 @@ const saveTimers = {};
 $('betsGrid').addEventListener('input', e => {
   const inp = e.target; if (!inp.dataset.m) return;
   const mid = +inp.dataset.m;
+  // Bloqueo 1: rechazar si el partido ya comenzó (protege contra manipulación de DOM)
+  const m = MATCHES.find(x => x.id === mid);
+  if (m && started(m)) { inp.value = APUESTAS_CACHE[mid]?.[inp.dataset.s] ?? ''; return; }
   APUESTAS_CACHE[mid] = APUESTAS_CACHE[mid] || { gl: null, gv: null };
   APUESTAS_CACHE[mid][inp.dataset.s] = inp.value !== '' ? +inp.value : null;
   const card = document.getElementById('card-'+mid);
@@ -509,6 +512,9 @@ $('betsGrid').addEventListener('input', e => {
 async function saveApuesta(mid) {
   const bet = APUESTAS_CACHE[mid];
   if (bet.gl == null || bet.gv == null) return;
+  // Bloqueo 2 (definitivo): si el partido ya comenzó, no guardar bajo ninguna circunstancia
+  const m = MATCHES.find(x => x.id === mid);
+  if (!m || started(m)) return;
   await sb.from('apuestas').upsert({
     usuario_id: sesion.id, partido_id: mid,
     goles_local: bet.gl, goles_vis: bet.gv,
@@ -522,10 +528,14 @@ $('betStage').onchange = renderBets;
 window.saveAllApuestas = async () => {
   const btn = $('btnSaveApuestas');
   if (btn) { btn.textContent = '⏳ Guardando…'; btn.disabled = true; }
-  // Flush any pending auto-save timers
   Object.keys(saveTimers).forEach(mid => { clearTimeout(saveTimers[mid]); delete saveTimers[mid]; });
+  // Solo guarda partidos que NO han comenzado
   const jobs = Object.entries(APUESTAS_CACHE)
-    .filter(([,b]) => b.gl != null && b.gv != null)
+    .filter(([mid, b]) => {
+      if (b.gl == null || b.gv == null) return false;
+      const m = MATCHES.find(x => x.id === +mid);
+      return m && !started(m);
+    })
     .map(([mid]) => saveApuesta(+mid));
   await Promise.all(jobs);
   if (btn) {
@@ -533,6 +543,24 @@ window.saveAllApuestas = async () => {
     setTimeout(() => { btn.textContent = '💾 Guardar mis apuestas'; btn.disabled = false; }, 2500);
   }
 };
+
+// Re-renderiza apuestas automáticamente cuando el próximo partido empiece
+// (por si la página estaba abierta antes del pitazo y los inputs quedaron sin bloquear)
+function scheduleNextLockRefresh() {
+  const now = Date.now();
+  const next = MATCHES
+    .filter(m => !started(m))
+    .map(m => new Date(m.fecha + 'T' + m.hora + ':00-05:00').getTime())
+    .filter(t => t > now)
+    .sort((a, b) => a - b)[0];
+  if (!next) return;
+  const ms = next - now + 2000; // 2s de margen tras el pitazo
+  setTimeout(() => {
+    if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
+    scheduleNextLockRefresh(); // programa el siguiente
+  }, ms);
+}
+scheduleNextLockRefresh();
 
 // ── RESULTADOS (solo lectura) ─────────────────────
 function renderRes() {
