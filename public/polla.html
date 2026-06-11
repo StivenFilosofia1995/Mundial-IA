@@ -407,6 +407,7 @@ function renderBets() {
       <div class="bet-top">
         <span class="stage">${m.etapa}</span>
         <span>P${m.id} · ${fmtWhen(m)}${whenTag}</span>
+        <button onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
@@ -482,6 +483,7 @@ function renderRes() {
         <span class="stage">${m.etapa}</span>
         <span>P${m.id} · ${fmtWhen(m)}</span>
         ${live&&!r ? `<span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span>` : ''}
+        <button onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s;margin-left:auto" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
@@ -673,7 +675,11 @@ window.openMemberModal = async (uid, name) => {
     const res = RESULTADOS[m.id];
     const bet = userBets[m.id];
     return `<div class="bet-card">
-      <div class="bet-top"><span class="stage">${m.etapa}</span><span>${fmtWhen(m)}</span></div>
+      <div class="bet-top">
+        <span class="stage">${m.etapa}</span>
+        <span>${fmtWhen(m)}</span>
+        <button onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s;margin-left:auto" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
+      </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
         <div style="font-family:'Archivo Black',sans-serif;font-size:18px;padding:0 10px;color:${bet&&bet.gl!=null?'var(--nodo)':'var(--grey)'}">
