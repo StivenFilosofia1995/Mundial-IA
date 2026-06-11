@@ -76,6 +76,9 @@ input[type="number"],input[type="text"]{font-family:'Spline Sans Mono',monospace
 footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:14px 4vw;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 .loading{text-align:center;padding:40px;font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--grey)}
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.2}}
+.bet-card.locked-res{background:#f7f7f5;border-color:#b0b0a8;box-shadow:3px 3px 0 #b0b0a8}
+.bet-card.locked-res input{background:#eeecea;color:#888;cursor:not-allowed;border-color:#ccc}
+.locked-label{font-family:'Spline Sans Mono',monospace;font-size:9px;color:#888;display:flex;align-items:center;gap:4px;text-transform:uppercase;letter-spacing:.08em}
 
 /* TABLERO EN VIVO */
 .live-board{background:var(--nodo);padding:20px 4vw 24px;border-bottom:4px solid var(--amarillo)}
@@ -181,6 +184,9 @@ const $ = id => document.getElementById(id);
 
 const DAYS = ['dom','lun','mar','mié','jue','vie','sáb'];
 const flag  = (c,l) => c ? `<img class="flag" src="https://flagcdn.com/w80/${c}.png" alt="${l}">` : `<div class="flag-tbd">${(l||'').slice(0,3)||'?'}</div>`;
+const todayCOL = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+// Resultado bloqueado: ya fue guardado Y el partido es de hoy o del pasado
+const isLocked = m => { const r = RESULTADOS[m.id]; return !!(r && r.gl != null && r.gl !== '' && m.fecha <= todayCOL()); };
 const fmtWhen = m => { const d=new Date(m.fecha+'T12:00:00-05:00'); return `${DAYS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1} · ${m.hora}`; };
 
 // ── LOGIN ──────────────────────────────────────────
@@ -261,25 +267,31 @@ function renderRes() {
 
   $('resGrid').innerHTML = list.map(m => {
     const r = RESULTADOS[m.id] || { gl: '', gv: '', gol: '' };
-    const saved = r.gl != null && r.gl !== '';
-    return `<div class="bet-card ${saved ? 'saved' : ''}" id="res-${m.id}">
+    const saved  = r.gl != null && r.gl !== '';
+    const locked = isLocked(m);
+    const dis    = locked ? ' disabled' : '';
+    return `<div class="bet-card ${saved ? 'saved' : ''} ${locked ? 'locked-res' : ''}" id="res-${m.id}">
       <div class="bet-top">
         <span class="stage">${m.etapa}</span>
         <span>P${m.id} · ${fmtWhen(m)}</span>
-        ${saved ? `<button class="btn danger" style="font-size:9px;padding:2px 8px" onclick="borrar(${m.id})">🗑 Borrar</button>` : ''}
+        ${locked
+          ? `<span class="locked-label">🔒 Resultado fijo · no editable</span>`
+          : saved
+          ? `<button class="btn danger" style="font-size:9px;padding:2px 8px" onclick="borrar(${m.id})">🗑 Borrar</button>`
+          : ''}
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local, m.local)}<span>${m.local}</span></div>
         <input class="score-in" type="number" min="0" max="20"
-          value="${r.gl != null && r.gl !== '' ? r.gl : ''}" data-m="${m.id}" data-s="gl">
+          value="${r.gl != null && r.gl !== '' ? r.gl : ''}" data-m="${m.id}" data-s="gl"${dis}>
         <span class="score-sep">–</span>
         <input class="score-in" type="number" min="0" max="20"
-          value="${r.gv != null && r.gv !== '' ? r.gv : ''}" data-m="${m.id}" data-s="gv">
+          value="${r.gv != null && r.gv !== '' ? r.gv : ''}" data-m="${m.id}" data-s="gv"${dis}>
         <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis, m.visitante)}</div>
       </div>
       <input type="text" class="gol-input"
         placeholder="⚽ Goleadores del partido (ej: Jugador1 23' · Jugador2 67')"
-        value="${(r.gol || '').replace(/"/g, '&quot;')}" data-m="${m.id}" data-s="gol">
+        value="${(r.gol || '').replace(/"/g, '&quot;')}" data-m="${m.id}" data-s="gol"${dis}>
     </div>`;
   }).join('') || '<div class="loading">Sin partidos en esta fase.</div>';
 }
@@ -289,6 +301,8 @@ const timers = {};
 $('resGrid').addEventListener('input', e => {
   const inp = e.target; if (!inp.dataset.m) return;
   const mid = +inp.dataset.m;
+  const m = MATCHES.find(x => x.id === mid);
+  if (m && isLocked(m)) return; // resultado bloqueado: partido de hoy/pasado ya guardado
   RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null, gol: '' };
   if (inp.dataset.s === 'gol') {
     RESULTADOS[mid].gol = inp.value;
@@ -316,6 +330,11 @@ async function saveResultado(mid) {
 }
 
 window.borrar = async (mid) => {
+  const m = MATCHES.find(x => x.id === mid);
+  if (m && isLocked(m)) {
+    alert('🔒 No se puede borrar: el partido ya se jugó hoy o es del pasado. El resultado es definitivo.');
+    return;
+  }
   if (!confirm(`¿Borrar resultado del partido ${mid}?`)) return;
   await sb.from('resultados').delete().eq('partido_id', mid);
   delete RESULTADOS[mid];
