@@ -124,8 +124,13 @@ CREATE POLICY "anon_all_asistencias" ON asistencias FOR ALL TO anon USING (true)
 --   +$500 goles local adivinados
 --   +$500 goles visitante adivinados
 --   MÁXIMO $2.500 por partido (exacto perfecto)
+-- Solo evalúa partidos que ya han comenzado (hora Colombia UTC-5)
 -- ============================================================
-CREATE OR REPLACE VIEW v_tabla AS
+
+-- DROP primero para poder cambiar columnas sin error 42P16
+DROP VIEW IF EXISTS v_tabla;
+
+CREATE VIEW v_tabla AS
 SELECT
   u.id,
   u.nombre,
@@ -153,8 +158,11 @@ SELECT
   END), 0)                              AS aciertos
 FROM usuarios u
 LEFT JOIN apuestas   a ON a.usuario_id = u.id
+LEFT JOIN partidos   p ON p.id = a.partido_id
 LEFT JOIN resultados r ON r.partido_id = a.partido_id
   AND a.goles_local IS NOT NULL AND a.goles_vis IS NOT NULL
+  -- solo contar partidos que ya comenzaron (hora en UTC, Colombia = UTC-5 → +5h)
+  AND (p.fecha::timestamp + p.hora::interval + INTERVAL '5 hours') < NOW()
 GROUP BY u.id, u.nombre, u.apellido
 ORDER BY puntos DESC NULLS LAST, exactos DESC NULLS LAST;
 

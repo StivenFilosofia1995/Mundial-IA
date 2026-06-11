@@ -180,6 +180,7 @@ footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:16px 4vw;font-f
   <p class="note">EXACTO 3 PTS · ACIERTO 1 PT · +$500 GOL ADIVINADO (L/V) · EXACTO = $2.500 MÁX · SE GUARDAN AUTOMÁTICO · SE BLOQUEAN AL INICIO.</p>
   <div class="row">
     <select id="betStage"><option value="">TODAS LAS FASES</option></select>
+    <button class="btn primary" id="btnSaveApuestas" onclick="saveAllApuestas()">💾 Guardar mis apuestas</button>
     <button class="btn blue" onclick="location.href='/dashboard.html'">📅 Calendario</button>
   </div>
   <div id="betsGrid" class="bets-grid"><div class="loading">Cargando partidos…</div></div>
@@ -360,7 +361,7 @@ function renderBets() {
   MATCHES.forEach(m => {
     const res = RESULTADOS[m.id];
     const bet = APUESTAS_CACHE[m.id];
-    if (!res || !bet || bet.gl == null || bet.gv == null) return;
+    if (!res || !started(m) || !bet || bet.gl == null || bet.gv == null) return;
     sumEval++;
     const p  = points(bet, res);
     const cp = calcPesos(bet, res);
@@ -390,7 +391,7 @@ function renderBets() {
     const whenTag  = diffDays === 0 ? ' · <b style="color:var(--rojo)">HOY</b>' : diffDays === 1 ? ' · <b style="color:var(--nodo)">MAÑANA</b>' : '';
 
     let bottomHtml;
-    if (res) {
+    if (res && started(m)) {
       bottomHtml = buildResultBar(bet, res, m.local, m.visitante);
     } else {
       const statusSpan = live
@@ -449,6 +450,21 @@ async function saveApuesta(mid) {
 }
 $('betStage').onchange = renderBets;
 
+window.saveAllApuestas = async () => {
+  const btn = $('btnSaveApuestas');
+  if (btn) { btn.textContent = '⏳ Guardando…'; btn.disabled = true; }
+  // Flush any pending auto-save timers
+  Object.keys(saveTimers).forEach(mid => { clearTimeout(saveTimers[mid]); delete saveTimers[mid]; });
+  const jobs = Object.entries(APUESTAS_CACHE)
+    .filter(([,b]) => b.gl != null && b.gv != null)
+    .map(([mid]) => saveApuesta(+mid));
+  await Promise.all(jobs);
+  if (btn) {
+    btn.textContent = '✓ Guardado';
+    setTimeout(() => { btn.textContent = '💾 Guardar mis apuestas'; btn.disabled = false; }, 2500);
+  }
+};
+
 // ── RESULTADOS (admin) ──────────────────────────────
 function renderRes() {
   const st = $('resStage').value;
@@ -471,7 +487,7 @@ function renderRes() {
           value="${r.gv!=null&&r.gv!==''?r.gv:''}" data-m="${m.id}" data-s="gv">
         <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
       </div>
-      <input type="text" class="gol-input" placeholder="⚽ Goleadores: Mbappé 23', Kane 67p'"
+      <input type="text" class="gol-input" placeholder="⚽ Goleadores del partido (ej: Jugador1 23' · Jugador2 67')"
         value="${(r.gol||'').replace(/"/g,'&quot;')}" data-m="${m.id}" data-s="gol">
     </div>`;
   }).join('');
