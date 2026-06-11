@@ -119,11 +119,10 @@ CREATE POLICY "anon_all_asistencias" ON asistencias FOR ALL TO anon USING (true)
 -- ============================================================
 -- 5. VISTA: TABLA DE POSICIONES CON PESOS COP
 -- Fórmula por partido:
---   +$500 resultado correcto (ganador/empate)
---   +$1.000 bonus si marcador exacto
---   +$500 goles local adivinados
---   +$500 goles visitante adivinados
---   MÁXIMO $2.500 por partido (exacto perfecto)
+--   +$1.000 si resultado correcto (ganador/empate)
+--   +$500 por cada gol local adivinado
+--   +$500 por cada gol visitante adivinado
+--   MÁXIMO $2.000 por partido (resultado + 2 goles locales + 2 goles visitantes)
 -- Solo evalúa partidos que ya han comenzado (hora Colombia UTC-5)
 -- ============================================================
 
@@ -143,8 +142,7 @@ SELECT
     ELSE 0
   END), 0)                              AS puntos,
   COALESCE(SUM(
-    CASE WHEN SIGN(a.goles_local - a.goles_vis) = SIGN(r.goles_local - r.goles_vis) THEN 500 ELSE 0 END
-    + CASE WHEN a.goles_local = r.goles_local AND a.goles_vis = r.goles_vis THEN 1000 ELSE 0 END
+    CASE WHEN SIGN(a.goles_local - a.goles_vis) = SIGN(r.goles_local - r.goles_vis) THEN 1000 ELSE 0 END
     + CASE WHEN a.goles_local = r.goles_local THEN 500 ELSE 0 END
     + CASE WHEN a.goles_vis   = r.goles_vis   THEN 500 ELSE 0 END
   ), 0)                                 AS pesos,
@@ -161,7 +159,6 @@ LEFT JOIN apuestas   a ON a.usuario_id = u.id
 LEFT JOIN partidos   p ON p.id = a.partido_id
 LEFT JOIN resultados r ON r.partido_id = a.partido_id
   AND a.goles_local IS NOT NULL AND a.goles_vis IS NOT NULL
-  -- solo contar partidos que ya comenzaron (hora en UTC, Colombia = UTC-5 → +5h)
   AND (p.fecha::timestamp + p.hora::interval + INTERVAL '5 hours') < NOW()
 GROUP BY u.id, u.nombre, u.apellido
 ORDER BY puntos DESC NULLS LAST, exactos DESC NULLS LAST;
