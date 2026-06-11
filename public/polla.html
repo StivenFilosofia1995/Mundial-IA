@@ -256,10 +256,20 @@ window.cerrarSesion = () => { localStorage.removeItem('polla-sesion'); window.lo
 const $ = id => document.getElementById(id);
 const DAYS = ['dom','lun','mar','mié','jue','vie','sáb'];
 const flag  = (c,l) => c ? `<img class="flag" src="https://flagcdn.com/w80/${c}.png" alt="${l}">` : `<div class="flag-tbd">${(l||'').slice(0,3)||'?'}</div>`;
-const started  = m => new Date(m.fecha+'T'+m.hora+':00-05:00') <= new Date();
-const isLive   = m => { const s=new Date(m.fecha+'T'+m.hora+':00-05:00'),mins=(Date.now()-s)/60000; return mins>=0&&mins<130; };
-// Apuesta bloqueada: el partido es de HOY o ya pasó (cierre al inicio del día, no al pitazo)
-const betLocked = m => m.fecha <= new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+const started   = m => new Date(m.fecha+'T'+m.hora+':00-05:00') <= new Date();
+const isLive    = m => { const s=new Date(m.fecha+'T'+m.hora+':00-05:00'),mins=(Date.now()-s)/60000; return mins>=0&&mins<130; };
+// Apuesta bloqueada si CUALQUIERA de estas condiciones se cumple:
+//  1. Fecha de hoy o pasada (regla de día)
+//  2. Pitazo ya pasó en hora Colombia (regla de hora exacta)
+//  3. ESPN ya detectó que el partido está en curso o terminó (tiempo real)
+const betLocked = m => {
+  const todayCol = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  if (m.fecha < todayCol) return true;                          // fecha pasada
+  if (m.fecha === todayCol) return true;                        // día del partido
+  if (started(m)) return true;                                  // pitazo pasó
+  if (RESULTADOS[m.id] != null) return true;                    // ESPN detectó inicio
+  return false;
+};
 const fmtPesos = p => '$'+new Intl.NumberFormat('es-CO').format(p);
 const fmtWhen  = m => { const d=new Date(m.fecha+'T12:00:00-05:00'); return `${DAYS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1} · ${m.hora}`; };
 
@@ -548,17 +558,10 @@ window.saveAllApuestas = async () => {
   }
 };
 
-// Re-renderiza apuestas a medianoche COL para bloquear los partidos del nuevo día
-function scheduleNextLockRefresh() {
-  const nowCOL = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bogota' }));
-  const msCOL  = new Date(nowCOL.getFullYear(), nowCOL.getMonth(), nowCOL.getDate() + 1, 0, 0, 1).getTime()
-                 - nowCOL.getTime();
-  setTimeout(() => {
-    if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
-    scheduleNextLockRefresh();
-  }, msCOL);
-}
-scheduleNextLockRefresh();
+// Polling cada 30s: re-evalúa locks en tiempo real (cubre pitazos exactos y señal ESPN)
+setInterval(() => {
+  if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
+}, 30_000);
 
 // ── RESULTADOS (solo lectura) ─────────────────────
 function renderRes() {
