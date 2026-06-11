@@ -313,8 +313,52 @@ function buildResultBar(bet, res, localName, visName) {
     </div>`;
 }
 
+// ── AGENDAR PARTIDO ──────────────────────────────────
 const pad = n => String(n).padStart(2,'0');
-function downloadIcs(m) {
+
+function agendarPartido(m) {
+  const title = `⚽ ${m.local} vs ${m.visitante} — ${m.etapa}`;
+  const location = `${m.estadio}, ${m.ciudad}`;
+  const details = `Mundial 2026 · ${m.hora} hora Colombia · Polla NODO`;
+
+  // Calcular fechas en UTC (Colombia es UTC-5)
+  const [y,mo,d]=m.fecha.split('-').map(Number),[h,mi]=m.hora.split(':').map(Number);
+  const start = new Date(Date.UTC(y,mo-1,d,h+5,mi));
+  const end = new Date(start.getTime()+72e5); // +2 horas
+
+  // Formato para URLs de calendario
+  const googleDate = t => t.toISOString().replace(/-|:|\.\d+/g,'');
+  const outlookDate = t => t.toISOString();
+
+  // Crear mini menú
+  const menu = document.createElement('div');
+  menu.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:3px solid var(--nodo);box-shadow:8px 8px 0 var(--amarillo);padding:20px;z-index:300;min-width:320px';
+  menu.innerHTML = `
+    <h3 style="font-family:'Archivo Black',sans-serif;font-size:16px;color:var(--nodo);margin-bottom:14px">📆 Agendar: ${m.local} vs ${m.visitante}</h3>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn primary" onclick="window.open('https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${googleDate(start)}/${googleDate(end)}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}','_blank');this.closest('div').parentElement.parentElement.remove()" style="width:100%;justify-content:center;display:flex;gap:8px;font-size:13px">
+        📅 Google Calendar
+      </button>
+      <button class="btn blue" onclick="window.open('https://outlook.live.com/calendar/0/deeplink/compose?subject=${encodeURIComponent(title)}&startdt=${outlookDate(start)}&enddt=${outlookDate(end)}&body=${encodeURIComponent(details)}&location=${encodeURIComponent(location)}','_blank');this.closest('div').parentElement.parentElement.remove()" style="width:100%;justify-content:center;display:flex;gap:8px;font-size:13px">
+        📧 Outlook / Office 365
+      </button>
+      <button class="btn" onclick="descargarIcs(MATCHES.find(x=>x.id===${m.id}));this.closest('div').parentElement.parentElement.remove()" style="width:100%;justify-content:center;display:flex;gap:8px;font-size:13px">
+        💾 Descargar .ics
+      </button>
+      <button onclick="this.closest('div').parentElement.parentElement.remove()" style="background:transparent;border:none;color:var(--grey);cursor:pointer;font-size:11px;margin-top:4px;font-family:monospace">Cancelar</button>
+    </div>
+  `;
+
+  // Overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,30,.6);z-index:299';
+  overlay.onclick = () => { overlay.remove(); menu.remove(); };
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(menu);
+}
+
+function descargarIcs(m) {
   const [y,mo,d]=m.fecha.split('-').map(Number),[h,mi]=m.hora.split(':').map(Number);
   const s=new Date(Date.UTC(y,mo-1,d,h+5,mi)),e=new Date(s.getTime()+72e5);
   const f=t=>t.getUTCFullYear()+pad(t.getUTCMonth()+1)+pad(t.getUTCDate())+'T'+pad(t.getUTCHours())+pad(t.getUTCMinutes())+'00Z';
@@ -327,7 +371,9 @@ function downloadIcs(m) {
   a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));
   a.download=`M${m.id}_${m.local}_vs_${m.visitante}.ics`.replace(/\s+/g,'_'); a.click();
 }
-window.downloadIcs = downloadIcs;
+
+window.agendarPartido = agendarPartido;
+window.descargarIcs = descargarIcs;
 
 // ── INIT ────────────────────────────────────────────
 async function init() {
@@ -407,7 +453,7 @@ function renderBets() {
       <div class="bet-top">
         <span class="stage">${m.etapa}</span>
         <span>P${m.id} · ${fmtWhen(m)}${whenTag}</span>
-        <button onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
+        <button onclick="agendarPartido(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
@@ -483,7 +529,7 @@ function renderRes() {
         <span class="stage">${m.etapa}</span>
         <span>P${m.id} · ${fmtWhen(m)}</span>
         ${live&&!r ? `<span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span>` : ''}
-        <button onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s;margin-left:auto" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
+        <button onclick="agendarPartido(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s;margin-left:auto" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
@@ -557,7 +603,7 @@ async function renderCo() {
         <div class="co-when">📅 ${fmtWhen(m)} (hora COL)</div>
         <div class="co-where">📍 ${m.estadio} · ${m.ciudad} · ${m.etapa}</div>
         <div class="co-actions" style="flex-direction:column;gap:8px">
-          <button class="btn primary" style="font-size:13px;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%" onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}))">
+          <button class="btn primary" style="font-size:13px;padding:11px 16px;display:flex;align-items:center;justify-content:center;gap:8px;width:100%" onclick="agendarPartido(MATCHES.find(x=>x.id===${m.id}))">
             📆 Agendar en Outlook / Teams / Google
           </button>
           ${!yaApuntado
@@ -678,7 +724,7 @@ window.openMemberModal = async (uid, name) => {
       <div class="bet-top">
         <span class="stage">${m.etapa}</span>
         <span>${fmtWhen(m)}</span>
-        <button onclick="downloadIcs(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s;margin-left:auto" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
+        <button onclick="agendarPartido(MATCHES.find(x=>x.id===${m.id}));event.stopPropagation()" style="background:transparent;border:none;cursor:pointer;font-size:16px;padding:2px 6px;opacity:.6;transition:opacity .15s;margin-left:auto" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.6'" title="📆 Agendar en calendario">📆</button>
       </div>
       <div class="bet-teams">
         <div class="bt">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
