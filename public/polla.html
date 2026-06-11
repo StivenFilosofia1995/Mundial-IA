@@ -258,16 +258,11 @@ const DAYS = ['dom','lun','mar','mié','jue','vie','sáb'];
 const flag  = (c,l) => c ? `<img class="flag" src="https://flagcdn.com/w80/${c}.png" alt="${l}">` : `<div class="flag-tbd">${(l||'').slice(0,3)||'?'}</div>`;
 const started   = m => new Date(m.fecha+'T'+m.hora+':00-05:00') <= new Date();
 const isLive    = m => { const s=new Date(m.fecha+'T'+m.hora+':00-05:00'),mins=(Date.now()-s)/60000; return mins>=0&&mins<130; };
-// Apuesta bloqueada si CUALQUIERA de estas condiciones se cumple:
-//  1. Fecha de hoy o pasada (regla de día)
-//  2. Pitazo ya pasó en hora Colombia (regla de hora exacta)
-//  3. ESPN ya detectó que el partido está en curso o terminó (tiempo real)
+// Apuesta bloqueada 10 minutos antes del pitazo (o antes si ESPN ya detectó inicio)
 const betLocked = m => {
-  const todayCol = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
-  if (m.fecha < todayCol) return true;                          // fecha pasada
-  if (m.fecha === todayCol) return true;                        // día del partido
-  if (started(m)) return true;                                  // pitazo pasó
-  if (RESULTADOS[m.id] != null) return true;                    // ESPN detectó inicio
+  const kickoff = new Date(m.fecha + 'T' + m.hora + ':00-05:00').getTime();
+  if (Date.now() >= kickoff - 10 * 60 * 1000) return true;   // 10 min antes del pitazo
+  if (RESULTADOS[m.id] != null) return true;                  // ESPN detectó inicio
   return false;
 };
 const fmtPesos = p => '$'+new Intl.NumberFormat('es-CO').format(p);
