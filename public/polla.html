@@ -509,17 +509,23 @@ function renderRes() {
 
 // ── TABLA ──────────────────────────────────────────
 async function renderBoard() {
-  const { data } = await sb.from('v_tabla').select('*');
-  $('board').innerHTML = (data||[]).length
-    ? `<table><tr><th>#</th><th>Participante</th><th class="num">Exactos</th><th class="num">Aciertos</th><th class="num">Evaluados</th><th class="num">Puntos</th><th class="num" style="color:var(--amarillo)">💰 Pesos</th></tr>`+
-      (data||[]).map((r,i) =>
-        `<tr class="${i<3?'podio-'+(i+1):''} ${r.id===sesion.id?'yo':''}">
-          <td>${i+1}</td><td><b>${r.nombre_completo}</b>${r.id===sesion.id?' <small style="font-size:10px;color:var(--grey)">(tú)</small>':''}</td>
-          <td class="num">${r.exactos||0}</td><td class="num">${r.aciertos||0}</td>
-          <td class="num">${r.evaluados||0}</td><td class="num big-pts">${r.puntos||0}</td>
-          <td class="num" style="font-family:'Spline Sans Mono',monospace;font-size:12px;font-weight:700;color:#15803d">${fmtPesos(r.pesos||0)}</td></tr>`
-      ).join('')+'</table>'
-    : '<div class="warn">Aún no hay participantes con apuestas evaluadas.</div>';
+  const { data, error } = await sb.from('v_tabla').select('*');
+  if (error) {
+    $('board').innerHTML = `<div class="warn">⚠️ Error cargando tabla: ${error.message}<br><small>¿Ya corriste el schema.sql actualizado en Supabase?</small></div>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    $('board').innerHTML = '<div class="warn">⚠️ No hay usuarios registrados en la polla, o la vista v_tabla no existe.<br><small>Corre el schema.sql completo en Supabase SQL Editor.</small></div>';
+    return;
+  }
+  $('board').innerHTML = `<table><tr><th>#</th><th>Participante</th><th class="num">Exactos</th><th class="num">Aciertos</th><th class="num">Evaluados</th><th class="num">Puntos</th><th class="num" style="color:var(--amarillo)">💰 Pesos</th></tr>`+
+    data.map((r,i) =>
+      `<tr class="${i<3?'podio-'+(i+1):''} ${r.id===sesion.id?'yo':''}">
+        <td>${i+1}</td><td><b>${r.nombre_completo}</b>${r.id===sesion.id?' <small style="font-size:10px;color:var(--grey)">(tú)</small>':''}</td>
+        <td class="num">${r.exactos||0}</td><td class="num">${r.aciertos||0}</td>
+        <td class="num">${r.evaluados||0}</td><td class="num big-pts">${r.puntos||0}</td>
+        <td class="num" style="font-family:'Spline Sans Mono',monospace;font-size:12px;font-weight:700;color:#15803d">${fmtPesos(r.pesos||0)}</td></tr>`
+    ).join('')+'</table>';
 }
 
 // ── COLOMBIA ──────────────────────────────────────
