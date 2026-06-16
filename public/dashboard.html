@@ -109,6 +109,10 @@ main{padding:20px 5vw 80px;max-width:1200px;margin:0 auto}
 .goleadores-dash{font-family:'Spline Sans Mono',monospace;font-size:10px;color:#374151;margin-top:8px;padding-top:7px;border-top:1px dashed rgba(0,17,102,.2);line-height:1.5}
 .tc{display:inline-block;width:9px;height:13px;border-radius:1px;vertical-align:middle;margin-right:2px;flex:none;box-shadow:1px 1px 0 rgba(0,0,0,.28)}
 .tc-y{background:#FCD116}.tc-r{background:#CE1126}
+.final-badge{font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--grey);border:1.5px solid var(--grey);padding:2px 8px}
+.stats-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--nodo);margin-bottom:3px}
+.venue-info{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);text-align:center;margin-top:8px}
+.r-score-big{font-size:30px !important}
 .empty{text-align:center;padding:40px;color:var(--grey);font-size:13px;font-family:'Spline Sans Mono',monospace}
 footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:14px 5vw;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
 @media(max-width:640px){.match-row{grid-template-columns:70px 1fr}.stage-col{display:none}.toolbar input{min-width:100px}}
@@ -258,36 +262,42 @@ function fmtCard(s) {
 
 // ── RESULTADOS DEL DÍA ─────────────────────────────
 function resCard(m) {
-  const r   = RESULTADOS[m.id];
-  const col = isCol(m);
+  const r    = RESULTADOS[m.id];
+  const col  = isCol(m);
   const live = isLive(m);
-  const scoreHtml = live && r
-    ? `<div class="r-score" style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:60px"><div>${r.gl}–${r.gv}</div><span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span></div>`
-    : r
-    ? `<div class="r-score">${r.gl}–${r.gv}</div>`
-    : (live
-        ? `<div class="r-score pending"><span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span></div>`
-        : `<div class="r-score pending">${m.hora}<br><span style="font-size:8px">COL</span></div>`);
-  return `<div class="res-card ${r?'has-result':''} ${col?'co':''}" style="${live?'border-color:var(--rojo);box-shadow:3px 3px 0 var(--rojo)':''}">
-    <div class="r-top">
-      <span class="etapa">${m.etapa}</span>
-      <span>P${m.id} · ${m.hora} COL · ${m.ciudad}</span>
-    </div>
-    <div class="r-teams">
-      <div class="r-team">${flag(m.codigo_local,m.local)}<span>${m.local}</span></div>
-      ${scoreHtml}
-      <div class="r-team right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
-    </div>
-    ${r&&r.gol ? '<div class="goleadores-dash">'+r.gol.split(' · ').map(g=>'<div>⚽ '+g+'</div>').join('')+'</div>' : ''}
-    ${r&&r.tar ? '<div class="goleadores-dash" style="border-top:none;padding-top:0;margin-top:2px">'+r.tar.split(' · ').map(t=>'<div>'+fmtCard(t)+'</div>').join('')+'</div>' : ''}
-    ${!r?`<div style="text-align:center;margin-top:10px"><button class="ics-btn" onclick="downloadIcs(${m.id})">📆 Agendar partido</button></div>`:''}
-  </div>`;
+  const done = started(m) && !live;
+  const statusBadge = live
+    ? '<span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span>'
+    : (done && r ? '<span class="final-badge">FINAL</span>' : '');
+  let scoreHtml;
+  if (live && r)  scoreHtml = '<div class="r-score r-score-big">' + r.gl + '–' + r.gv + '</div>';
+  else if (r)     scoreHtml = '<div class="r-score r-score-big">' + r.gl + '–' + r.gv + '</div>';
+  else if (live)  scoreHtml = '<div class="r-score pending"><span class="en-vivo-badge"><span class="en-vivo-dot"></span>EN VIVO</span></div>';
+  else            scoreHtml = '<div class="r-score pending">' + m.hora + '<br><span style="font-size:8px">COL</span></div>';
+  const golHtml = r && r.gol
+    ? '<div class="goleadores-dash"><div class="stats-label">⚽ GOLES</div>' + r.gol.split(' · ').map(g => '<div>' + g + '</div>').join('') + '</div>'
+    : '';
+  const tarHtml = r && r.tar
+    ? '<div class="goleadores-dash" style="border-top:none;padding-top:0;margin-top:2px"><div class="stats-label">TARJETAS</div>' + r.tar.split(' · ').map(t => '<div>' + fmtCard(t) + '</div>').join('') + '</div>'
+    : '';
+  const icsHtml = !r
+    ? '<div style="text-align:center;margin-top:10px"><button class="ics-btn" onclick="downloadIcs(' + m.id + ')">📆 Agendar partido</button></div>'
+    : '';
+  return '<div class="res-card ' + (r ? 'has-result ' : '') + (col ? 'co' : '') + '" style="' + (live ? 'border-color:var(--rojo);box-shadow:3px 3px 0 var(--rojo)' : '') + '">'
+    + '<div class="r-top"><span class="etapa">' + m.etapa + '</span>' + statusBadge + '</div>'
+    + '<div class="r-teams">'
+    + '<div class="r-team">' + flag(m.codigo_local, m.local) + '<span>' + m.local + '</span></div>'
+    + scoreHtml
+    + '<div class="r-team right"><span>' + m.visitante + '</span>' + flag(m.codigo_vis, m.visitante) + '</div>'
+    + '</div>'
+    + '<div class="venue-info">📍 ' + (m.estadio || m.ciudad) + ' · ' + m.hora + ' COL</div>'
+    + golHtml + tarHtml + icsHtml
+    + '</div>';
 }
 
 function renderResultados() {
   if (!MATCHES.length) { $('todaySection').innerHTML = noDataMsg(); $('yesterdaySection').innerHTML = ''; return; }
-  const nowCOL   = new Date(new Date().toLocaleString('en-CA', { timeZone: 'America/Bogota' }));
-  const todayStr = nowCOL.toLocaleDateString('en-CA');
+  const todayStr = new Date(Date.now() - 5*60*60*1000).toISOString().slice(0,10);
 
   // Matches today
   const hoy = MATCHES.filter(m => m.fecha === todayStr);

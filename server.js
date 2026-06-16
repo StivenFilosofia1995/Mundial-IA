@@ -85,11 +85,15 @@ async function findPartidoId(localEs, visEs) {
 
 async function upsertResultado(pid, gl, gv, goleadores, tarjetas = '') {
   if (gl == null || gv == null) return;
-  await sbRest('/resultados', 'POST', [{
+  // Solo incluir goleadores/tarjetas si tienen datos — evita sobrescribir
+  // con string vacío cuando ESPN actualiza el marcador sin detalle de goles
+  const body = {
     partido_id: pid, goles_local: gl, goles_vis: gv,
-    goleadores: goleadores || '', tarjetas: tarjetas || '',
     updated_at: new Date().toISOString()
-  }]);
+  };
+  if (goleadores) body.goleadores = goleadores;
+  if (tarjetas)   body.tarjetas   = tarjetas;
+  await sbRest('/resultados', 'POST', [body]);
 }
 
 // ── SOURCE 1: ESPN (múltiples slugs + headers de navegador) ──────
@@ -135,15 +139,38 @@ async function processESPN(events) {
     const pid = await findPartidoId(homeEs, awayEs);
     if (!pid) { console.log('[espn] no en DB:', homeEs, 'vs', awayEs); continue; }
 
+    const homeTeamId = home.team?.id;
+
     const goals = (comp.details || [])
       .filter(d => d.type?.text === 'Goal Scored' || d.type?.id === '70' || d.scoringPlay)
       .map(d => {
         const n = d.athletesInvolved?.[0]?.displayName || d.participants?.[0]?.displayName || '?';
         const m = d.clock?.value != null ? Math.round(d.clock.value/60)+"'" : '';
-        return `${n}${m?' '+m:''}${d.penaltyKick?' (pen)':''}${d.ownGoal?' (pp)':''}`;
+        const isOwn = !!(d.ownGoal);
+        const pen   = d.penaltyKick ? ' (pen)' : '';
+        const og    = isOwn ? ' (pp)' : '';
+        // Determinar equipo: comparar team.id con el equipo local
+        const dTeamId = d.team?.id || d.athletesInvolved?.[0]?.team?.id;
+        const byHome  = dTeamId ? dTeamId === homeTeamId : null;
+        // Si gol en contra, el gol va al equipo contrario
+        const prefix  = byHome !== null ? ((byHome !== isOwn) ? 'L' : 'V') : '';
+        return `${prefix ? prefix+':' : ''}${n}${m?' '+m:''}${pen}${og}`;
       });
 
-    await upsertResultado(pid, gl, gv, goals.join(' · '));
+    const cards = (comp.details || [])
+      .filter(d => { const t = d.type?.text||''; return t.includes('Card') || d.yellowCard || d.redCard; })
+      .map(d => {
+        const n = d.athletesInvolved?.[0]?.displayName || '?';
+        const m = d.clock?.value != null ? Math.round(d.clock.value/60)+"'" : '';
+        const dTeamId = d.team?.id || d.athletesInvolved?.[0]?.team?.id;
+        const isHome  = dTeamId ? dTeamId === homeTeamId : null;
+        const prefix  = isHome !== null ? (isHome ? 'L' : 'V') : '';
+        const txt     = d.type?.text || '';
+        const emoji   = txt === 'Red Card' || d.redCard ? '🟥' : txt === 'Yellow-Red Card' ? '🟨🟥' : '🟨';
+        return `${prefix ? prefix+':' : ''}${emoji} ${n}${m?' '+m:''}`;
+      });
+
+    await upsertResultado(pid, gl, gv, goals.join(' · '), cards.join(' · '));
     console.log(`[espn] ✓ ${homeEs} ${gl}–${gv} ${awayEs}${goals.length?' | '+goals.join(', '):''}`);
     updated++;
   }
@@ -189,23 +216,31 @@ async function getSofaIncidents(eventId) {
     const goals = incidents
       .filter(i => i.incidentType === 'goal' || i.incidentType === 'penalty')
       .map(i => {
-        const n = i.player?.name || i.player?.shortName || '?';
-        const t = i.time ? `${i.time}'` : (i.addedTime ? `${i.addedTime}'` : '');
+        const n   = i.player?.name || i.player?.shortName || '?';
+        const t   = i.time ? `${i.time}'` : (i.addedTime ? `+${i.addedTime}'` : '');
         const pen = i.incidentType === 'penalty' ? ' (pen)' : '';
         const og  = i.isOwnGoal ? ' (pp)' : '';
-        return `${n}${t?' '+t:''}${pen}${og}`;
+        // isHome: true = equipo local hizo el incidente
+        // gol en contra: el gol va al equipo contrario
+        const isHome = i.isHome !== false;
+        const prefix = i.isHome !== undefined
+          ? ((isHome !== !!i.isOwnGoal) ? 'L' : 'V')
+          : '';
+        return `${prefix ? prefix+':' : ''}${n}${t?' '+t:''}${pen}${og}`;
       })
       .join(' · ');
 
     const cards = incidents
       .filter(i => i.incidentType === 'card')
       .map(i => {
-        const n = i.player?.name || i.player?.shortName || '?';
-        const t = i.time ? `${i.time}'` : '';
-        const emoji = i.incidentClass === 'red' ? '🟥'
-                    : i.incidentClass === 'yellowRed' ? '🟨🟥'
-                    : '🟨';
-        return `${emoji} ${n}${t?' '+t:''}`;
+        const n      = i.player?.name || i.player?.shortName || '?';
+        const t      = i.time ? `${i.time}'` : '';
+        const emoji  = i.incidentClass === 'red' ? '🟥'
+                     : i.incidentClass === 'yellowRed' ? '🟨🟥'
+                     : '🟨';
+        const isHome = i.isHome !== false;
+        const prefix = i.isHome !== undefined ? (isHome ? 'L' : 'V') : '';
+        return `${prefix ? prefix+':' : ''}${emoji} ${n}${t?' '+t:''}`;
       })
       .join(' · ');
 
@@ -232,17 +267,28 @@ async function processSofa(events) {
     const pid = await findPartidoId(homeEs, awayEs);
     if (!pid) { console.log('[sofa] no en DB:', homeEs, 'vs', awayEs); continue; }
 
-    // Solo pide incidents cuando el marcador cambió (evita req extra por ciclo)
+    // Cache del marcador para evitar re-pedir incidents en cada ciclo.
+    // Se re-fetcha si: (a) el marcador cambió, o (b) los goleadores en DB están vacíos
+    // (puede ocurrir si ESPN pisó los datos con string vacío antes del fix)
     const key = `${gl}-${gv}`;
     let gol = '', tar = '';
-    if (scoreCache.get(pid) !== key) {
+    const cached = scoreCache.get(pid);
+    let dbRow = null;
+    if (cached?.key === key && cached?.hasGoals) {
+      // Marcador igual y ya tenemos goleadores en cache → leer de DB
+      dbRow = await sbRest(`/resultados?partido_id=eq.${pid}&select=goleadores,tarjetas`);
+      gol = dbRow?.[0]?.goleadores || '';
+      tar = dbRow?.[0]?.tarjetas   || '';
+      // Si DB está vacío (ESPN limpió los datos), re-fetch igualmente
+      if (!gol && !tar) {
+        const inc = await getSofaIncidents(ev.id);
+        gol = inc.goals; tar = inc.cards;
+      }
+    } else {
+      // Marcador nuevo o sin cache → siempre pedir incidents
       const inc = await getSofaIncidents(ev.id);
       gol = inc.goals; tar = inc.cards;
-      scoreCache.set(pid, key);
-    } else {
-      const ex = await sbRest(`/resultados?partido_id=eq.${pid}&select=goleadores,tarjetas`);
-      gol = ex?.[0]?.goleadores || '';
-      tar = ex?.[0]?.tarjetas   || '';
+      scoreCache.set(pid, { key, hasGoals: !!(gol || tar) });
     }
 
     await upsertResultado(pid, gl, gv, gol, tar);

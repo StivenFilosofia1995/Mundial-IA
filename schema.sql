@@ -297,3 +297,54 @@ INSERT INTO partidos (id, etapa, fecha, hora, local, visitante, codigo_local, co
 (103,'Tercer puesto','2026-07-18','16:00','Perdedor P101','Perdedor P102',NULL,NULL,'Miami','Hard Rock Stadium'),
 (104,'Final','2026-07-19','14:00','Ganador P101','Ganador P102',NULL,NULL,'Nueva York/Nueva Jersey','MetLife Stadium')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- 7. PRONÓSTICOS DE FASES ELIMINATORIAS (BRACKET / LLAVES)
+-- Usuarios predicen qué equipos pasan a cada ronda.
+-- Admin confirma los resultados reales. Puntos automáticos.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS pronosticos_fase (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  usuario_id UUID        NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  fase       VARCHAR(30) NOT NULL,
+  equipos    TEXT[]      NOT NULL DEFAULT '{}',
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(usuario_id, fase)
+);
+
+-- Admin guarda qué equipos realmente clasificaron a cada ronda
+CREATE TABLE IF NOT EXISTS resultados_fase (
+  fase       VARCHAR(30) PRIMARY KEY,
+  equipos    TEXT[]      NOT NULL DEFAULT '{}',
+  confirmado BOOLEAN     DEFAULT false,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE pronosticos_fase ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resultados_fase  ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "anon_all_pronosticos_fase" ON pronosticos_fase;
+DROP POLICY IF EXISTS "anon_all_resultados_fase"  ON resultados_fase;
+CREATE POLICY "anon_all_pronosticos_fase" ON pronosticos_fase FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_resultados_fase"  ON resultados_fase  FOR ALL TO anon USING (true) WITH CHECK (true);
+
+DROP TRIGGER IF EXISTS trg_pronosticos_fase_updated_at ON pronosticos_fase;
+CREATE TRIGGER trg_pronosticos_fase_updated_at
+  BEFORE UPDATE ON pronosticos_fase
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON pronosticos_fase TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON pronosticos_fase TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON resultados_fase  TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON resultados_fase  TO authenticated;
+
+-- Habilitar Supabase Realtime para las tablas de llaves
+ALTER TABLE pronosticos_fase REPLICA IDENTITY FULL;
+ALTER TABLE resultados_fase  REPLICA IDENTITY FULL;
+
+-- Agregar a la publicación de Supabase Realtime (ignorar si ya existe)
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE pronosticos_fase, resultados_fase;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;

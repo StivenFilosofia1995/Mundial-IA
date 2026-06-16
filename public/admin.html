@@ -186,6 +186,17 @@ footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:14px 4vw;font-f
     </div>
     <p class="note">ESCRIBE EL MARCADOR Y GOLEADORES — SE GUARDA AUTOMÁTICO AL ESCRIBIR · BORRÓN EN ROJO POR SI TE EQUIVOCAS</p>
     <div class="bets-grid" id="resGrid"><div class="loading">Cargando partidos…</div></div>
+
+    <!-- ── GESTIÓN DE LLAVES (BRACKET) ── -->
+    <div style="margin-top:40px;padding-top:24px;border-top:3px solid var(--nodo)">
+      <div class="manual-head">
+        <h2>Llaves de eliminación</h2>
+        <span class="manual-badge" style="background:var(--amarillo);color:var(--nodo)">🏆 Bracket</span>
+        <span style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey)">Selecciona los equipos clasificados y confirma — los usuarios reciben puntos automáticamente</span>
+      </div>
+      <p class="note">SELECCIONA LOS EQUIPOS QUE CLASIFICARON REALMENTE · GUARDA Y CONFIRMA POR FASE · SOLO CONFIRMADAS DAN PUNTOS</p>
+      <div id="bracketAdmin"><div class="loading">Cargando…</div></div>
+    </div>
   </main>
 
   <footer>
@@ -344,6 +355,7 @@ function showPanel() {
   $('login-screen').style.display = 'none';
   $('admin-panel').style.display = 'block';
   init();
+  document.dispatchEvent(new Event('admin-ready'));
 }
 
 // Auto-login si ya está autenticado en esta sesión
@@ -545,6 +557,147 @@ sb.channel('admin-tablero-live')
     loadLeaderboard();
   })
   .subscribe();
+
+// ══════════════════════════════════════════════════
+// ADMIN BRACKET — GESTIÓN DE LLAVES
+// ══════════════════════════════════════════════════
+const BRACKET_EQUIPOS = {
+  A:[{n:'México',c:'mx'},{n:'Sudáfrica',c:'za'},{n:'Corea del Sur',c:'kr'},{n:'República Checa',c:'cz'}],
+  B:[{n:'Canadá',c:'ca'},{n:'Bosnia y Herzegovina',c:'ba'},{n:'Catar',c:'qa'},{n:'Suiza',c:'ch'}],
+  C:[{n:'Haití',c:'ht'},{n:'Escocia',c:'gb-sct'},{n:'Brasil',c:'br'},{n:'Marruecos',c:'ma'}],
+  D:[{n:'Estados Unidos',c:'us'},{n:'Paraguay',c:'py'},{n:'Australia',c:'au'},{n:'Turquía',c:'tr'}],
+  E:[{n:'Costa de Marfil',c:'ci'},{n:'Ecuador',c:'ec'},{n:'Alemania',c:'de'},{n:'Curazao',c:'cw'}],
+  F:[{n:'Países Bajos',c:'nl'},{n:'Japón',c:'jp'},{n:'Suecia',c:'se'},{n:'Túnez',c:'tn'}],
+  G:[{n:'Irán',c:'ir'},{n:'Nueva Zelanda',c:'nz'},{n:'Bélgica',c:'be'},{n:'Egipto',c:'eg'}],
+  H:[{n:'Arabia Saudita',c:'sa'},{n:'Uruguay',c:'uy'},{n:'España',c:'es'},{n:'Cabo Verde',c:'cv'}],
+  I:[{n:'Francia',c:'fr'},{n:'Senegal',c:'sn'},{n:'Irak',c:'iq'},{n:'Noruega',c:'no'}],
+  J:[{n:'Argentina',c:'ar'},{n:'Argelia',c:'dz'},{n:'Austria',c:'at'},{n:'Jordania',c:'jo'}],
+  K:[{n:'Portugal',c:'pt'},{n:'RD Congo',c:'cd'},{n:'Uzbekistán',c:'uz'},{n:'Colombia',c:'co'}],
+  L:[{n:'Ghana',c:'gh'},{n:'Panamá',c:'pa'},{n:'Inglaterra',c:'gb-eng'},{n:'Croacia',c:'hr'}],
+};
+const BRACKET_FASES = [
+  {id:'dieciseisavos',label:'Dieciseisavos de final',count:32,pts:2},
+  {id:'octavos',      label:'Octavos de final',      count:16,pts:3},
+  {id:'cuartos',      label:'Cuartos de final',       count:8, pts:5},
+  {id:'semis',        label:'Semifinales',            count:4, pts:8},
+  {id:'finalistas',   label:'Finalistas',             count:2, pts:12},
+  {id:'campeon',      label:'Campeón',                count:1, pts:20},
+];
+
+let ADMIN_BRACKET = {}; // fase -> { equipos: Set, confirmado: bool }
+
+async function loadBracketAdmin() {
+  const { data } = await sb.from('resultados_fase').select('*');
+  ADMIN_BRACKET = {};
+  (data || []).forEach(r => { ADMIN_BRACKET[r.fase] = { equipos: new Set(r.equipos || []), confirmado: r.confirmado }; });
+  renderBracketAdmin();
+}
+
+function renderBracketAdmin() {
+  const con = document.getElementById('bracketAdmin');
+  if (!con) return;
+
+  con.innerHTML = BRACKET_FASES.map(f => {
+    const state  = ADMIN_BRACKET[f.id] || { equipos: new Set(), confirmado: false };
+    const sel    = state.equipos;
+    const conf   = state.confirmado;
+    const count  = sel.size;
+    const full   = count >= f.count;
+
+    const teamsHtml = Object.entries(BRACKET_EQUIPOS).map(([grupo, teams]) => {
+      const rows = teams.map(t => {
+        const isSel = sel.has(t.n);
+        const disableCheck = conf || (!isSel && full);
+        return `<label style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:${conf?'default':'pointer'};border:1.5px solid ${isSel?'var(--nodo)':'transparent'};margin-bottom:2px;border-radius:2px;background:${isSel?'rgba(0,17,102,.06)':'transparent'};font-size:11px;font-family:'Spline Sans Mono',monospace" data-fase="${f.id}" data-equipo="${t.n}">
+          <input type="checkbox" ${isSel?'checked':''} ${disableCheck?'disabled':''} style="width:14px;height:14px;accent-color:var(--nodo);cursor:${conf?'default':'pointer'}">
+          ${flag(t.c,t.n)}
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.n}</span>
+        </label>`;
+      }).join('');
+      return `<div><div style="font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--nodo);font-weight:700;margin-bottom:3px;border-bottom:1px solid rgba(0,17,102,.12);padding-bottom:2px">Grupo ${grupo}</div>${rows}</div>`;
+    }).join('');
+
+    return `<div style="background:var(--card);border:2px solid var(--nodo);box-shadow:3px 3px 0 var(--nodo);margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--nodo);color:var(--blanco);flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-family:'Archivo Black',sans-serif;font-size:14px;color:var(--amarillo)">${f.label}</div>
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:rgba(255,255,255,.6)">Selecciona ${f.count} equipo${f.count>1?'s':''} · ${f.pts} pts cada acierto para usuarios</div>
+        </div>
+        ${conf ? `<span style="background:#16a34a;color:#fff;font-family:'Spline Sans Mono',monospace;font-size:10px;padding:3px 10px;font-weight:700">✓ CONFIRMADO</span>` : `<span style="background:var(--amarillo);color:var(--nodo);font-family:'Spline Sans Mono',monospace;font-size:10px;padding:3px 10px;font-weight:700">PENDIENTE</span>`}
+      </div>
+      <div style="padding:8px 14px;font-family:'Spline Sans Mono',monospace;font-size:11px;border-bottom:1px solid rgba(0,17,102,.1);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="admin-bc-cnt-${f.id}" style="color:${full?'var(--rojo)':'var(--grey)'};font-weight:${full?700:400}">${count}/${f.count} seleccionados</span>
+        ${!conf ? `
+          <button class="btn primary" style="font-size:10px;padding:4px 12px" onclick="saveFaseAdmin('${f.id}',false)">💾 Guardar borrador</button>
+          <button class="btn danger" style="font-size:10px;padding:4px 12px" onclick="saveFaseAdmin('${f.id}',true)" ${count<f.count?'disabled title="Selecciona los '+f.count+' equipos primero"':''}>✓ Confirmar y dar puntos</button>
+        ` : `
+          <button class="btn" style="font-size:10px;padding:4px 12px;border-color:var(--rojo);color:var(--rojo)" onclick="desconfirmarFase('${f.id}')">↩ Desconfirmar (editar)</button>
+        `}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;padding:10px 14px" id="admin-teams-${f.id}">
+        ${teamsHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  // Listeners
+  con.querySelectorAll('[data-fase][data-equipo] input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const label  = cb.closest('[data-fase]');
+      const faseId = label.dataset.fase;
+      const equipo = label.dataset.equipo;
+      const fase   = BRACKET_FASES.find(f => f.id === faseId);
+      if (!fase) return;
+      if (!ADMIN_BRACKET[faseId]) ADMIN_BRACKET[faseId] = { equipos: new Set(), confirmado: false };
+      if (ADMIN_BRACKET[faseId].confirmado) { cb.checked = !cb.checked; return; }
+      if (cb.checked) {
+        if (ADMIN_BRACKET[faseId].equipos.size >= fase.count) { cb.checked = false; return; }
+        ADMIN_BRACKET[faseId].equipos.add(equipo);
+      } else {
+        ADMIN_BRACKET[faseId].equipos.delete(equipo);
+      }
+      const cnt  = ADMIN_BRACKET[faseId].equipos.size;
+      const full2 = cnt >= fase.count;
+      const cntEl = document.getElementById('admin-bc-cnt-' + faseId);
+      if (cntEl) { cntEl.textContent = `${cnt}/${fase.count} seleccionados`; cntEl.style.color = full2 ? 'var(--rojo)' : 'var(--grey)'; cntEl.style.fontWeight = full2 ? 700 : 400; }
+      document.getElementById('admin-teams-' + faseId)
+        ?.querySelectorAll('input[type=checkbox]')
+        .forEach(box => { if (!box.checked) box.disabled = full2; });
+      // Habilitar botón Confirmar si ya tiene el número correcto
+      const btnConf = con.querySelector(`#bf-admin-${faseId} .btn.danger`);
+      // Re-render only the counter (full re-render would lose state)
+    });
+  });
+}
+
+window.saveFaseAdmin = async (faseId, confirmar) => {
+  const state   = ADMIN_BRACKET[faseId] || { equipos: new Set(), confirmado: false };
+  const equipos = Array.from(state.equipos);
+  if (confirmar && !confirm(`¿Confirmar los ${equipos.length} equipos clasificados en "${faseId}"? Los usuarios recibirán puntos inmediatamente. Esta acción es importante — podrás deshacerla si hay error.`)) return;
+  const { error } = await sb.from('resultados_fase').upsert(
+    { fase: faseId, equipos, confirmado: confirmar, updated_at: new Date().toISOString() },
+    { onConflict: 'fase' }
+  );
+  if (error) { alert('Error: ' + error.message); return; }
+  if (ADMIN_BRACKET[faseId]) ADMIN_BRACKET[faseId].confirmado = confirmar;
+  alert(confirmar ? `✓ ${faseId} confirmado. Los usuarios recibirán sus puntos.` : `✓ Borrador guardado.`);
+  await loadBracketAdmin();
+};
+
+window.desconfirmarFase = async (faseId) => {
+  if (!confirm(`¿Desconfirmar "${faseId}" y permitir edición? Los puntos se recalcularán.`)) return;
+  const state   = ADMIN_BRACKET[faseId] || { equipos: new Set() };
+  const equipos = Array.from(state.equipos);
+  await sb.from('resultados_fase').upsert(
+    { fase: faseId, equipos, confirmado: false, updated_at: new Date().toISOString() },
+    { onConflict: 'fase' }
+  );
+  await loadBracketAdmin();
+};
+
+// Cargar bracket admin al inicializar el panel
+const origInit = window.onload;
+document.addEventListener('admin-ready', () => loadBracketAdmin());
 </script>
 </body>
 </html>
