@@ -115,6 +115,50 @@ async function fetchESPN(dateNum) {
   return [];
 }
 
+// Obtiene detalles completos (goles/tarjetas) del endpoint summary de ESPN
+async function fetchESPNSummary(eventId) {
+  for (const slug of ESPN_SLUGS) {
+    try {
+      const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${slug}/summary?event=${eventId}`;
+      const r = await fetch(url, {
+        headers: { 'User-Agent': BROWSER_UA, 'Accept': 'application/json', 'Referer': 'https://www.espn.com/' }
+      });
+      if (r.ok) { console.log(`[espn-sum] ✓ event ${eventId}`); return r.json(); }
+    } catch {}
+  }
+  return null;
+}
+
+// Extrae goles del formato summary de ESPN (keyEvents / scoringPlays / plays)
+function parseESPNDetails(details, homeTeamId) {
+  const goals = [], cards = [];
+  for (const d of details) {
+    const txt = d.type?.text || '';
+    const isGoal = d.scoringPlay === true || txt === 'Goal Scored' || d.type?.id === '70';
+    const isCard = txt.includes('Card') || d.yellowCard || d.redCard;
+    if (!isGoal && !isCard) continue;
+
+    const n = d.athletesInvolved?.[0]?.displayName || d.participants?.[0]?.athlete?.displayName || '?';
+    const rawMin = d.clock?.value != null ? Math.round(d.clock.value / 60) : null;
+    const m = rawMin != null ? `${rawMin}'` : (d.clock?.displayValue || '');
+    const dTeamId = d.team?.id || d.athletesInvolved?.[0]?.team?.id;
+    const byHome = dTeamId ? dTeamId === homeTeamId : null;
+
+    if (isGoal) {
+      const isOwn = !!(d.ownGoal);
+      const pen = d.penaltyKick ? ' (pen)' : '';
+      const og  = isOwn ? ' (pp)' : '';
+      const prefix = byHome !== null ? ((byHome !== isOwn) ? 'L' : 'V') : '';
+      goals.push(`${prefix ? prefix+':' : ''}${n}${m?' '+m:''}${pen}${og}`);
+    } else {
+      const prefix = byHome !== null ? (byHome ? 'L' : 'V') : '';
+      const emoji = txt === 'Red Card' || d.redCard ? '🟥' : txt === 'Yellow-Red Card' ? '🟨🟥' : '🟨';
+      cards.push(`${prefix ? prefix+':' : ''}${emoji} ${n}${m?' '+m:''}`);
+    }
+  }
+  return { goals, cards };
+}
+
 async function processESPN(events) {
   let updated = 0, hasLive = false;
   for (const ev of events) {
@@ -141,34 +185,21 @@ async function processESPN(events) {
 
     const homeTeamId = home.team?.id;
 
-    const goals = (comp.details || [])
-      .filter(d => d.type?.text === 'Goal Scored' || d.type?.id === '70' || d.scoringPlay)
-      .map(d => {
-        const n = d.athletesInvolved?.[0]?.displayName || d.participants?.[0]?.displayName || '?';
-        const m = d.clock?.value != null ? Math.round(d.clock.value/60)+"'" : '';
-        const isOwn = !!(d.ownGoal);
-        const pen   = d.penaltyKick ? ' (pen)' : '';
-        const og    = isOwn ? ' (pp)' : '';
-        // Determinar equipo: comparar team.id con el equipo local
-        const dTeamId = d.team?.id || d.athletesInvolved?.[0]?.team?.id;
-        const byHome  = dTeamId ? dTeamId === homeTeamId : null;
-        // Si gol en contra, el gol va al equipo contrario
-        const prefix  = byHome !== null ? ((byHome !== isOwn) ? 'L' : 'V') : '';
-        return `${prefix ? prefix+':' : ''}${n}${m?' '+m:''}${pen}${og}`;
-      });
+    // Intentar extraer goles/tarjetas del scoreboard (comp.details)
+    let { goals, cards } = parseESPNDetails(comp.details || [], homeTeamId);
 
-    const cards = (comp.details || [])
-      .filter(d => { const t = d.type?.text||''; return t.includes('Card') || d.yellowCard || d.redCard; })
-      .map(d => {
-        const n = d.athletesInvolved?.[0]?.displayName || '?';
-        const m = d.clock?.value != null ? Math.round(d.clock.value/60)+"'" : '';
-        const dTeamId = d.team?.id || d.athletesInvolved?.[0]?.team?.id;
-        const isHome  = dTeamId ? dTeamId === homeTeamId : null;
-        const prefix  = isHome !== null ? (isHome ? 'L' : 'V') : '';
-        const txt     = d.type?.text || '';
-        const emoji   = txt === 'Red Card' || d.redCard ? '🟥' : txt === 'Yellow-Red Card' ? '🟨🟥' : '🟨';
-        return `${prefix ? prefix+':' : ''}${emoji} ${n}${m?' '+m:''}`;
-      });
+    // Si hay goles en el marcador pero no en details → pedir summary (más completo)
+    const finished = ['STATUS_FINAL','STATUS_FULL_TIME'].includes(status);
+    if (goals.length === 0 && (gl + gv) > 0) {
+      const sum = await fetchESPNSummary(ev.id);
+      if (sum) {
+        // Summary puede tener keyEvents, scoringPlays o plays
+        const sumDetails = sum.keyEvents || sum.scoringPlays || sum.plays || [];
+        const parsed = parseESPNDetails(sumDetails, homeTeamId);
+        if (parsed.goals.length > 0) goals = parsed.goals;
+        if (parsed.cards.length > 0) cards = parsed.cards;
+      }
+    }
 
     await upsertResultado(pid, gl, gv, goals.join(' · '), cards.join(' · '));
     console.log(`[espn] ✓ ${homeEs} ${gl}–${gv} ${awayEs}${goals.length?' | '+goals.join(', '):''}`);
@@ -361,7 +392,7 @@ app.get('/api/sync-espn', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
-// Barrido histórico: rellena goleadores/tarjetas vacíos con SofaScore
+// Barrido histórico: rellena goleadores/tarjetas vacíos usando ESPN summary
 async function resyncMissingGoals() {
   const allRes = await sbRest('/resultados?goles_local=not.is.null&select=partido_id,goles_local,goles_vis,goleadores,tarjetas');
   const empty = (allRes || []).filter(r => !r.goleadores && !r.tarjetas);
@@ -376,32 +407,89 @@ async function resyncMissingGoals() {
 
   let fixed = 0, skipped = 0;
   for (const [fecha, parts] of Object.entries(byDate)) {
-    const events = await fetchSofaScore(fecha);
+    const dateNum = fecha.replace(/-/g, '');
+    const espnEvents = await fetchESPN(dateNum);
+
     for (const p of parts) {
-      const ev = events.find(e => {
-        const h = TEAM_ES[e.homeTeam?.name] || TEAM_ES[e.homeTeam?.shortName] || e.homeTeam?.name || '';
-        const a = TEAM_ES[e.awayTeam?.name] || TEAM_ES[e.awayTeam?.shortName] || e.awayTeam?.name || '';
-        return (h === p.local && a === p.visitante) || (h === p.visitante && a === p.local);
+      // Buscar el evento ESPN que corresponde a este partido
+      const ev = espnEvents.find(e => {
+        const comp = e.competitions?.[0];
+        const h = comp?.competitors?.find(c => c.homeAway === 'home');
+        const a = comp?.competitors?.find(c => c.homeAway === 'away');
+        if (!h || !a) return false;
+        const hEs = TEAM_ES[h.team?.displayName] || TEAM_ES[h.team?.name] || h.team?.displayName || '';
+        const aEs = TEAM_ES[a.team?.displayName] || TEAM_ES[a.team?.name] || a.team?.displayName || '';
+        return (hEs === p.local && aEs === p.visitante) || (hEs === p.visitante && aEs === p.local);
       });
+
       if (!ev) { skipped++; continue; }
-      const inc = await getSofaIncidents(ev.id);
-      if (inc.goals || inc.cards) {
-        const row = empty.find(r => r.partido_id === p.id);
-        await upsertResultado(p.id, row.goles_local, row.goles_vis, inc.goals, inc.cards);
+
+      const comp = ev.competitions?.[0];
+      const homeComp = comp?.competitors?.find(c => c.homeAway === 'home');
+      const homeTeamId = homeComp?.team?.id;
+      const row = empty.find(r => r.partido_id === p.id);
+
+      // 1. Intentar comp.details del scoreboard
+      let { goals, cards } = parseESPNDetails(comp?.details || [], homeTeamId);
+
+      // 2. Si vacío, usar endpoint summary (más completo para partidos terminados)
+      if (goals.length === 0) {
+        const sum = await fetchESPNSummary(ev.id);
+        if (sum) {
+          const sumDetails = sum.keyEvents || sum.scoringPlays || sum.plays || [];
+          const parsed = parseESPNDetails(sumDetails, homeTeamId);
+          if (parsed.goals.length > 0) goals = parsed.goals;
+          if (parsed.cards.length > 0) cards = parsed.cards;
+        }
+        await new Promise(r => setTimeout(r, 400)); // pausa tras summary request
+      }
+
+      if (goals.length > 0) {
+        await upsertResultado(p.id, row.goles_local, row.goles_vis, goals.join(' · '), cards.join(' · '));
         scoreCache.delete(p.id);
         fixed++;
-        console.log(`[resync] ✓ ${p.local} vs ${p.visitante} (${fecha})`);
+        console.log(`[resync] ✓ ${p.local} vs ${p.visitante} (${fecha}): ${goals.join(', ')}`);
+      } else {
+        skipped++;
+        console.log(`[resync] sin goles ESPN: ${p.local} vs ${p.visitante} (${fecha})`);
       }
-      await new Promise(resolve => setTimeout(resolve, 300));
     }
   }
-  console.log(`[resync] ${fixed} rellenos · ${skipped} no encontrados · ${empty.length} total vacios`);
+  console.log(`[resync] ${fixed} rellenos · ${skipped} sin datos · ${empty.length} total vacios`);
   return { fixed, skipped, total: empty.length };
 }
 
 app.get('/api/resync-all', async (req, res) => {
   try { res.json({ ok: true, ...(await resyncMissingGoals()) }); }
   catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
+// Diagnóstico rápido: qué tiene ESPN right now para goles y tarjetas
+app.get('/api/debug-goals', async (req, res) => {
+  try {
+    const events = await fetchESPN(colDateNum());
+    const out = [];
+    for (const ev of events) {
+      const comp = ev.competitions?.[0];
+      const home = comp?.competitors?.find(c => c.homeAway === 'home');
+      const away = comp?.competitors?.find(c => c.homeAway === 'away');
+      const homeTeamId = home?.team?.id;
+      const { goals: goalsBoard, cards: cardsBoard } = parseESPNDetails(comp?.details || [], homeTeamId);
+      const sum = await fetchESPNSummary(ev.id);
+      const sumDetails = sum ? (sum.keyEvents || sum.scoringPlays || sum.plays || []) : [];
+      const { goals: goalsSum, cards: cardsSum } = parseESPNDetails(sumDetails, homeTeamId);
+      out.push({
+        match: `${home?.team?.displayName} ${home?.score ?? '?'}-${away?.score ?? '?'} ${away?.team?.displayName}`,
+        status: ev.status?.type?.name,
+        detailsCount: (comp?.details || []).length,
+        goalsFromBoard: goalsBoard,
+        cardsFromBoard: cardsBoard,
+        goalsFromSummary: goalsSum,
+        cardsFromSummary: cardsSum,
+      });
+    }
+    res.json({ date: colDate(), matches: out });
+  } catch(e) { res.json({ error: e.message }); }
 });
 
 // Marcadores actuales (polling de clientes cada 30s)
