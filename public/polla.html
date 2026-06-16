@@ -83,7 +83,9 @@ input[type="number"],input[type="text"],select{font-family:'Spline Sans Mono',mo
 .pts-3{background:var(--amarillo);color:var(--nodo)}.pts-1{background:var(--nodo);color:var(--blanco)}.pts-0{background:#e8eaf0;color:var(--grey)}
 .en-vivo-badge{display:inline-flex;align-items:center;gap:5px;background:var(--rojo);color:var(--blanco);font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:2px 8px}
 .en-vivo-dot{width:5px;height:5px;background:var(--blanco);border-radius:50%;animation:livepulse 1s infinite;flex:none}
-.goleadores-row{margin-top:7px;font-family:'Spline Sans Mono',monospace;font-size:10px;color:#374151;padding-top:6px;border-top:1px dashed rgba(0,17,102,.15)}
+.goleadores-row{margin-top:7px;font-family:'Spline Sans Mono',monospace;font-size:10px;color:#1e293b;padding-top:6px;border-top:1px dashed rgba(0,17,102,.15);line-height:1.7}
+.goleadores-row .gol-team-label{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--grey);margin-bottom:2px;font-weight:700}
+.goleadores-pending{margin-top:6px;font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--grey);border-top:1px dashed rgba(0,17,102,.1);padding-top:5px;font-style:italic}
 .tc{display:inline-block;width:9px;height:13px;border-radius:1px;vertical-align:middle;margin-right:2px;flex:none;box-shadow:1px 1px 0 rgba(0,0,0,.28)}
 .tc-y{background:#FCD116}.tc-r{background:#CE1126}
 .live-strip{height:2px;background:linear-gradient(90deg,var(--rojo),transparent);margin-top:8px;animation:livepulse 2s infinite}
@@ -355,7 +357,7 @@ function buildResultBar(bet, res, localName, visName) {
       Tu apuesta: <b>${bet.gl}–${bet.gv}</b>
       &nbsp;·&nbsp; Oficial: <b>${res.gl}–${res.gv}</b>
     </div>
-    ${buildGoalsHtml(res.gol, res.tar)}`;
+    ${buildGoalsHtml(res.gol, res.tar, localName, visName) || `<div class="goleadores-pending">⏳ Cargando detalle de goles…</div>`}`;
 }
 
 // ── AGENDAR PARTIDO ──────────────────────────────────
@@ -611,15 +613,15 @@ function fmtCard(s) {
 }
 
 // Muestra goles y tarjetas en dos columnas: local (izq) y visitante (der)
-// Los items tienen prefijo L: (local) o V: (visitante) del servidor
-function buildGoalsHtml(gol, tar) {
+// Acepta nombre de equipo local/visitante para etiquetas opcionales
+function buildGoalsHtml(gol, tar, localName, visName) {
   const parseItems = str => {
     if (!str || !str.trim()) return { L: [], V: [] };
     const L = [], V = [];
     str.split(' · ').filter(Boolean).forEach(item => {
       if (item.startsWith('L:')) L.push(item.slice(2).trim());
       else if (item.startsWith('V:')) V.push(item.slice(2).trim());
-      else L.push(item); // datos antiguos sin prefijo → local por defecto
+      else L.push(item); // datos sin prefijo → local por defecto
     });
     return { L, V };
   };
@@ -629,18 +631,21 @@ function buildGoalsHtml(gol, tar) {
   const hasV = g.V.length > 0 || t.V.length > 0;
   if (!hasL && !hasV) return '';
 
-  const colL = [
+  const labelL = localName ? `<div class="gol-team-label">${localName}</div>` : '';
+  const labelV = visName   ? `<div class="gol-team-label" style="text-align:right">${visName}</div>` : '';
+
+  const colL = labelL + [
     ...g.L.map(x => `<div>⚽ ${x}</div>`),
     ...t.L.map(x => `<div>${fmtCard(x)}</div>`),
   ].join('');
-  const colV = [
+  const colV = labelV + [
     ...g.V.map(x => `<div style="text-align:right">⚽ ${x}</div>`),
     ...t.V.map(x => `<div style="text-align:right">${fmtCard(x)}</div>`),
   ].join('');
 
   if (!hasV) return `<div class="goleadores-row">${colL}</div>`;
   if (!hasL) return `<div class="goleadores-row">${colV.replace(/style="text-align:right"/g, '')}</div>`;
-  return `<div class="goleadores-row" style="display:grid;grid-template-columns:1fr 1fr;gap:2px">
+  return `<div class="goleadores-row" style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
     <div>${colL}</div><div>${colV}</div>
   </div>`;
 }
@@ -670,7 +675,7 @@ function renderRes() {
         </div>
         <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
       </div>
-      ${r ? buildGoalsHtml(r.gol, r.tar) : ''}
+      ${r ? (buildGoalsHtml(r.gol, r.tar, m.local, m.visitante) || `<div class="goleadores-pending">⏳ Cargando detalle de goles…</div>`) : ''}
       ${live ? '<div class="live-strip"></div>' : ''}
     </div>`;
   };

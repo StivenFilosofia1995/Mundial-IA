@@ -362,45 +362,46 @@ app.get('/api/sync-espn', async (req, res) => {
 });
 
 // Barrido histórico: rellena goleadores/tarjetas vacíos con SofaScore
-app.get('/api/resync-all', async (req, res) => {
-  try {
-    const allRes = await sbRest('/resultados?goles_local=not.is.null&select=partido_id,goles_local,goles_vis,goleadores,tarjetas');
-    const empty = (allRes || []).filter(r => !r.goleadores && !r.tarjetas);
-    if (!empty.length) return res.json({ ok: true, fixed: 0, msg: 'Todos los resultados ya tienen goleadores.' });
+async function resyncMissingGoals() {
+  const allRes = await sbRest('/resultados?goles_local=not.is.null&select=partido_id,goles_local,goles_vis,goleadores,tarjetas');
+  const empty = (allRes || []).filter(r => !r.goleadores && !r.tarjetas);
+  if (!empty.length) { console.log('[resync] Sin vacíos — todo OK.'); return { fixed: 0, total: 0 }; }
 
-    const ids = empty.map(r => `"${r.partido_id}"`).join(',');
-    const partidos = await sbRest(`/partidos?id=in.(${ids})&select=id,local,visitante,fecha`);
-    if (!partidos?.length) return res.json({ ok: true, fixed: 0 });
+  const ids = empty.map(r => `"${r.partido_id}"`).join(',');
+  const partidos = await sbRest(`/partidos?id=in.(${ids})&select=id,local,visitante,fecha`);
+  if (!partidos?.length) return { fixed: 0, total: empty.length };
 
-    const byDate = {};
-    partidos.forEach(p => { (byDate[p.fecha] = byDate[p.fecha] || []).push(p); });
+  const byDate = {};
+  partidos.forEach(p => { (byDate[p.fecha] = byDate[p.fecha] || []).push(p); });
 
-    let fixed = 0, skipped = 0;
-    for (const [fecha, parts] of Object.entries(byDate)) {
-      const events = await fetchSofaScore(fecha);
-      for (const p of parts) {
-        const ev = events.find(e => {
-          const h = TEAM_ES[e.homeTeam?.name] || TEAM_ES[e.homeTeam?.shortName] || e.homeTeam?.name || '';
-          const a = TEAM_ES[e.awayTeam?.name] || TEAM_ES[e.awayTeam?.shortName] || e.awayTeam?.name || '';
-          return (h === p.local && a === p.visitante) || (h === p.visitante && a === p.local);
-        });
-        if (!ev) { skipped++; continue; }
-        const inc = await getSofaIncidents(ev.id);
-        if (inc.goals || inc.cards) {
-          const row = empty.find(r => r.partido_id === p.id);
-          await upsertResultado(p.id, row.goles_local, row.goles_vis, inc.goals, inc.cards);
-          scoreCache.delete(p.id);
-          fixed++;
-          console.log(`[resync] ✓ ${p.local} vs ${p.visitante} (${fecha})`);
-        }
-        await new Promise(resolve => setTimeout(resolve, 250)); // pausa anti-rate-limit
+  let fixed = 0, skipped = 0;
+  for (const [fecha, parts] of Object.entries(byDate)) {
+    const events = await fetchSofaScore(fecha);
+    for (const p of parts) {
+      const ev = events.find(e => {
+        const h = TEAM_ES[e.homeTeam?.name] || TEAM_ES[e.homeTeam?.shortName] || e.homeTeam?.name || '';
+        const a = TEAM_ES[e.awayTeam?.name] || TEAM_ES[e.awayTeam?.shortName] || e.awayTeam?.name || '';
+        return (h === p.local && a === p.visitante) || (h === p.visitante && a === p.local);
+      });
+      if (!ev) { skipped++; continue; }
+      const inc = await getSofaIncidents(ev.id);
+      if (inc.goals || inc.cards) {
+        const row = empty.find(r => r.partido_id === p.id);
+        await upsertResultado(p.id, row.goles_local, row.goles_vis, inc.goals, inc.cards);
+        scoreCache.delete(p.id);
+        fixed++;
+        console.log(`[resync] ✓ ${p.local} vs ${p.visitante} (${fecha})`);
       }
+      await new Promise(resolve => setTimeout(resolve, 300));
     }
-    res.json({ ok: true, fixed, skipped, total: empty.length });
-  } catch(e) {
-    console.error('[resync]', e.message);
-    res.json({ ok: false, error: e.message });
   }
+  console.log(`[resync] ${fixed} rellenos · ${skipped} no encontrados · ${empty.length} total vacios`);
+  return { fixed, skipped, total: empty.length };
+}
+
+app.get('/api/resync-all', async (req, res) => {
+  try { res.json({ ok: true, ...(await resyncMissingGoals()) }); }
+  catch(e) { res.json({ ok: false, error: e.message }); }
 });
 
 // Marcadores actuales (polling de clientes cada 30s)
@@ -482,6 +483,9 @@ if (SUPABASE_URL && SUPABASE_ANON) {
     async function go() { await pollAll(); t = setTimeout(go, liveActive ? 20_000 : 60_000); }
     go();
   }
+  // Rellenar goleadores históricos vacíos al arrancar y cada 3h
+  setTimeout(resyncMissingGoals, 12_000);
+  setInterval(resyncMissingGoals, 3 * 60 * 60 * 1000);
 } else {
   console.log('[live] sin Supabase — modo offline');
 }
