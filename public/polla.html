@@ -155,6 +155,7 @@ footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:16px 4vw;font-f
 .bracket-team.correct{background:#dcfce7!important;border-color:#16a34a!important}
 .bracket-team.wrong{background:#fee2e2!important;border-color:#dc2626!important;text-decoration:line-through;opacity:.7}
 .bracket-team.missed{background:#fef9c3!important;border-color:#ca8a04!important}
+.bracket-team.eliminated{opacity:.22!important;text-decoration:line-through;pointer-events:none;background:#f1f5f9!important;border-color:#cbd5e1!important;cursor:not-allowed}
 @media(max-width:600px){nav button{flex:1;padding:11px 6px;font-size:11px}.head-meta,.head-title{display:none}}
 </style>
 </head>
@@ -1030,6 +1031,17 @@ async function initBracket() {
 
 function faseLocked(f) { return Date.now() >= f.lock.getTime(); }
 
+// Retorna Set de equipos elegibles para una fase, basado en la fase anterior confirmada.
+// Si la fase anterior no está confirmada → null (todos disponibles).
+function getEligibleTeams(faseId) {
+  const idx = FASES_BRACKET.findIndex(f => f.id === faseId);
+  if (idx <= 0) return null; // primera fase → todos elegibles
+  const prev = FASES_BRACKET[idx - 1];
+  const prevRes = BRACKET_OFIC[prev.id];
+  if (!prevRes?.confirmado || !prevRes.equipos?.length) return null;
+  return new Set(prevRes.equipos);
+}
+
 function renderBracket() {
   const con = $('bracket-container');
   if (!con) return;
@@ -1048,19 +1060,24 @@ function renderBracket() {
       : `<span style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--amarillo)">🔓 Cierra ${lockDate}</span>`;
 
     const ptsWon = conf ? confList.filter(e => sel.has(e)).length * f.pts : 0;
+    const eligible = getEligibleTeams(f.id); // null = todos disponibles
+    const eliminadosNote = eligible !== null && !conf
+      ? `<span style="font-family:'Spline Sans Mono',monospace;font-size:9px;color:rgba(255,255,255,.55)"> · Solo clasificados de fase anterior</span>`
+      : '';
     const subDetail = conf
       ? `${f.pts} pts c/u · RESULTADO CONFIRMADO`
       : `${f.pts} pts por equipo acertado · máx ${f.count * f.pts} pts`;
 
     const teamsHtml = Object.entries(EQUIPOS_POR_GRUPO).map(([grupo, teams]) => {
       const rows = teams.map(t => {
-        const isSel     = sel.has(t.n);
-        const isCorrect = conf && confList.includes(t.n) && isSel;
-        const isWrong   = conf && !confList.includes(t.n) && isSel;
-        const isMissed  = conf && confList.includes(t.n) && !isSel;
-        const cls = isCorrect ? 'correct' : isWrong ? 'wrong' : isMissed ? 'missed' : '';
-        const disableCheck = locked || (!isSel && full);
-        return `<label class="bracket-team ${cls} ${locked ? 'locked' : ''}" data-fase="${f.id}" data-equipo="${t.n}">
+        const eliminated = eligible !== null && !eligible.has(t.n);
+        const isSel      = sel.has(t.n);
+        const isCorrect  = conf && confList.includes(t.n) && isSel;
+        const isWrong    = conf && !confList.includes(t.n) && isSel;
+        const isMissed   = conf && confList.includes(t.n) && !isSel;
+        const cls = eliminated ? 'eliminated' : isCorrect ? 'correct' : isWrong ? 'wrong' : isMissed ? 'missed' : '';
+        const disableCheck = locked || eliminated || (!isSel && full);
+        return `<label class="bracket-team ${cls} ${locked || eliminated ? 'locked' : ''}" data-fase="${f.id}" data-equipo="${t.n}">
           <input type="checkbox" ${isSel ? 'checked' : ''} ${disableCheck ? 'disabled' : ''}>
           ${flag(t.c, t.n)}
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${t.n}</span>
@@ -1073,7 +1090,7 @@ function renderBracket() {
       <div class="bracket-fase-head">
         <div>
           <div class="bracket-fase-title">${f.label}</div>
-          <div class="bracket-fase-sub">${subDetail}${conf ? ` · <span style="color:var(--amarillo);font-weight:700">+${ptsWon} pts ganados</span>` : ''}</div>
+          <div class="bracket-fase-sub">${subDetail}${conf ? ` · <span style="color:var(--amarillo);font-weight:700">+${ptsWon} pts ganados</span>` : ''}${eliminadosNote}</div>
         </div>
         ${lockLabel}
       </div>
@@ -1095,6 +1112,8 @@ function renderBracket() {
     cb.addEventListener('change', () => {
       const fase = FASES_BRACKET.find(f => f.id === faseId);
       if (!fase || faseLocked(fase)) { cb.checked = !cb.checked; return; }
+      const elig = getEligibleTeams(faseId);
+      if (elig !== null && !elig.has(equipo)) { cb.checked = false; return; } // eliminado
       if (!BRACKET_USER[faseId]) BRACKET_USER[faseId] = new Set();
       if (cb.checked) {
         if (BRACKET_USER[faseId].size >= fase.count) { cb.checked = false; return; }

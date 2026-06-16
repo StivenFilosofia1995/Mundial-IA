@@ -175,6 +175,7 @@ footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:14px 4vw;font-f
   <div class="toolbar">
     <select id="resStage"><option value="">TODAS LAS FASES</option></select>
     <button class="btn primary" id="btnSyncESPN" onclick="syncESPN()">🔄 Sincronizar ESPN</button>
+    <button class="btn" id="btnResync" onclick="resyncAll()" style="background:#f0f9ff;border-color:#0284c7;color:#0284c7">📋 Rellenar goleadores vacíos</button>
     <span class="sync-status" id="syncStatus">ESPN polling automático cada 60s</span>
   </div>
 
@@ -483,6 +484,27 @@ window.borrar = async (mid) => {
   await sb.from('resultados').delete().eq('partido_id', mid);
   delete RESULTADOS[mid];
   renderRes();
+};
+
+// ── BARRIDO DE GOLEADORES VACÍOS ───────────────────
+window.resyncAll = async () => {
+  const btn = $('btnResync');
+  const status = $('syncStatus');
+  btn.textContent = '⏳ Barriendo…'; btn.disabled = true;
+  status.textContent = 'Consultando SofaScore para goleadores vacíos…';
+  try {
+    const res = await fetch('/api/resync-all');
+    const { ok, fixed = 0, skipped = 0, total = 0, msg, error } = await res.json();
+    if (!ok) throw new Error(error || 'Error desconocido');
+    const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    status.textContent = msg || `✓ Rellenados ${fixed}/${total} partidos (${skipped} no encontrados) · ${now}`;
+    btn.textContent = `✓ ${fixed} rellenos`;
+    if (fixed > 0) { renderRes(); loadLeaderboard(); }
+  } catch (e) {
+    status.textContent = `✗ ${e.message}`;
+    btn.textContent = '✗ Error';
+  }
+  setTimeout(() => { btn.textContent = '📋 Rellenar goleadores vacíos'; btn.disabled = false; }, 5000);
 };
 
 // ── ESPN SYNC ──────────────────────────────────────
