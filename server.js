@@ -416,27 +416,37 @@ app.get('/api/sync-espn', async (req, res) => {
   } catch(e) { res.json({ error: e.message }); }
 });
 
-// Barrido histórico: rellena goleadores/tarjetas vacíos usando ESPN summary
+// Barrido histórico: rellena goleadores vacíos usando ESPN summary
 async function resyncMissingGoals() {
   const allRes = await sbRest('/resultados?goles_local=not.is.null&select=partido_id,goles_local,goles_vis,goleadores,tarjetas');
-  const empty = (allRes || []).filter(r => !r.goleadores && !r.tarjetas);
+  // Solo re-syncar partidos con goles (>0) y que no tengan goleadores todavía
+  const empty = (allRes || []).filter(r => !r.goleadores && (r.goles_local + r.goles_vis) > 0);
   if (!empty.length) { console.log('[resync] Sin vacíos — todo OK.'); return { fixed: 0, total: 0 }; }
 
   const ids = empty.map(r => `"${r.partido_id}"`).join(',');
   const partidos = await sbRest(`/partidos?id=in.(${ids})&select=id,local,visitante,fecha`);
   if (!partidos?.length) return { fixed: 0, total: empty.length };
 
-  const byDate = {};
-  partidos.forEach(p => { (byDate[p.fecha] = byDate[p.fecha] || []).push(p); });
+  // Caché de eventos ESPN por fecha para no repetir llamadas
+  const espnByDate = {};
+  async function getESPNForDate(fecha) {
+    if (espnByDate[fecha]) return espnByDate[fecha];
+    const evs = await fetchESPN(fecha.replace(/-/g, ''));
+    espnByDate[fecha] = evs;
+    return evs;
+  }
 
-  let fixed = 0, skipped = 0;
-  for (const [fecha, parts] of Object.entries(byDate)) {
-    const dateNum = fecha.replace(/-/g, '');
-    const espnEvents = await fetchESPN(dateNum);
-
-    for (const p of parts) {
-      // Buscar el evento ESPN que corresponde a este partido
-      const ev = espnEvents.find(e => {
+  // Busca el evento ESPN en fecha exacta y ±1 día (partidos que cruzan medianoche UTC)
+  async function findESPNEvent(p) {
+    const base = new Date(p.fecha + 'T12:00:00Z');
+    const dates = [
+      p.fecha,
+      new Date(base.getTime() - 86400000).toISOString().slice(0,10),
+      new Date(base.getTime() + 86400000).toISOString().slice(0,10),
+    ];
+    for (const d of dates) {
+      const evs = await getESPNForDate(d);
+      const ev = evs.find(e => {
         const comp = e.competitions?.[0];
         const h = comp?.competitors?.find(c => c.homeAway === 'home');
         const a = comp?.competitors?.find(c => c.homeAway === 'away');
@@ -445,52 +455,56 @@ async function resyncMissingGoals() {
         const aEs = TEAM_ES[a.team?.displayName] || TEAM_ES[a.team?.name] || a.team?.displayName || '';
         return (hEs === p.local && aEs === p.visitante) || (hEs === p.visitante && aEs === p.local);
       });
+      if (ev) return ev;
+    }
+    return null;
+  }
 
-      if (!ev) { skipped++; continue; }
+  let fixed = 0, skipped = 0;
+  for (const p of partidos) {
+    const ev = await findESPNEvent(p);
+    if (!ev) { skipped++; console.log(`[resync] no encontrado en ESPN: ${p.local} vs ${p.visitante}`); continue; }
 
-      const comp = ev.competitions?.[0];
-      const homeComp = comp?.competitors?.find(c => c.homeAway === 'home');
-      const homeTeamId = homeComp?.team?.id;
-      const row = empty.find(r => r.partido_id === p.id);
+    const comp = ev.competitions?.[0];
+    const homeComp = comp?.competitors?.find(c => c.homeAway === 'home');
+    const homeTeamId = homeComp?.team?.id;
+    const row = empty.find(r => r.partido_id === p.id);
 
-      // 1. Intentar comp.details del scoreboard
-      let { goals, cards } = parseESPNDetails(comp?.details || [], homeTeamId);
+    // 1. comp.details del scoreboard
+    let { goals, cards } = parseESPNDetails(comp?.details || [], homeTeamId);
 
-      // 2. Si vacío, usar endpoint summary (siempre más completo para partidos terminados)
-      if (goals.length === 0) {
-        const sum = await fetchESPNSummary(ev.id);
-        if (sum) {
-          const sumComp = sum.header?.competitions?.[0] || sum.competitions?.[0];
-          const candidates = [
-            ...(sumComp?.details || []),
-            ...(sum.scoringPlays || []),
-            ...(sum.keyEvents    || []),
-            ...(sum.plays        || []),
-          ];
-          const seen = new Set();
-          const uniq = candidates.filter(d => {
-            const k = `${d.athletesInvolved?.[0]?.displayName||''}${d.clock?.value||''}${d.type?.id||''}`;
-            if (seen.has(k)) return false; seen.add(k); return true;
-          });
-          const parsed = parseESPNDetails(uniq, homeTeamId);
-          if (parsed.goals.length > 0) goals = parsed.goals;
-          if (parsed.cards.length > 0) cards = parsed.cards;
-        }
-        await new Promise(r => setTimeout(r, 400));
-      }
+    // 2. Siempre pedir summary para partidos terminados (más completo que scoreboard)
+    const sum = await fetchESPNSummary(ev.id);
+    if (sum) {
+      const sumComp = sum.header?.competitions?.[0] || sum.competitions?.[0];
+      const candidates = [
+        ...(sumComp?.details || []),
+        ...(sum.scoringPlays || []),
+        ...(sum.keyEvents    || []),
+        ...(sum.plays        || []),
+      ];
+      const seen = new Set();
+      const uniq = candidates.filter(d => {
+        const k = `${d.athletesInvolved?.[0]?.displayName||''}${d.clock?.value||''}${d.type?.id||''}`;
+        if (seen.has(k)) return false; seen.add(k); return true;
+      });
+      const parsed = parseESPNDetails(uniq, homeTeamId);
+      if (parsed.goals.length > goals.length) goals = parsed.goals;
+      if (parsed.cards.length > cards.length) cards = parsed.cards;
+    }
+    await new Promise(r => setTimeout(r, 300));
 
-      if (goals.length > 0) {
-        await upsertResultado(p.id, row.goles_local, row.goles_vis, goals.join(' · '), cards.join(' · '));
-        scoreCache.delete(p.id);
-        fixed++;
-        console.log(`[resync] ✓ ${p.local} vs ${p.visitante} (${fecha}): ${goals.join(', ')}`);
-      } else {
-        skipped++;
-        console.log(`[resync] sin goles ESPN: ${p.local} vs ${p.visitante} (${fecha})`);
-      }
+    if (goals.length > 0) {
+      await upsertResultado(p.id, row.goles_local, row.goles_vis, goals.join(' · '), cards.join(' · '));
+      scoreCache.delete(p.id);
+      fixed++;
+      console.log(`[resync] ✓ ${p.local} vs ${p.visitante}: ${goals.join(', ')}`);
+    } else {
+      skipped++;
+      console.log(`[resync] ESPN sin detalles: ${p.local} vs ${p.visitante} (${p.fecha})`);
     }
   }
-  console.log(`[resync] ${fixed} rellenos · ${skipped} sin datos · ${empty.length} total vacios`);
+  console.log(`[resync] ${fixed} rellenos · ${skipped} sin datos · ${empty.length} total`);
   return { fixed, skipped, total: empty.length };
 }
 
