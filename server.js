@@ -99,6 +99,7 @@ async function upsertResultado(pid, gl, gv, goleadores, tarjetas = '') {
   // on_conflict=partido_id: usa la restricción UNIQUE de partido_id (no el PK auto id)
   const r = await sbRest('/resultados?on_conflict=partido_id', 'POST', [body]);
   if (r === null) console.error(`[db] upsert falló: partido=${pid} gol="${goleadores}" tar="${tarjetas}"`);
+  scheduleBracketUpdate(); // actualiza nombres de equipos en eliminatorias
   return r;
 }
 
@@ -400,6 +401,180 @@ async function pollAll() {
   else      console.log(`[poll] sin cambios (${date})`);
 }
 
+// ── BRACKET ADVANCEMENT ──────────────────────────────────────────
+// Detectar si un nombre es placeholder (aún sin equipo real asignado)
+const isPlaceholder = n => !n || /^[12][A-L]$/.test(n) || /^Mejor 3°/.test(n) || /^Ganador P/.test(n) || /^Perdedor P/.test(n);
+
+// Configuración de dieciseisavos (id → local slot, vis slot o null para "Mejor 3°")
+const BRACKET_D16 = [
+  {id:73,l:'2A',  v:'2B'  },
+  {id:74,l:'1E',  v:null  }, // vis = Mejor 3° (A/B/C/D/F)
+  {id:75,l:'1F',  v:'2C'  },
+  {id:76,l:'1C',  v:'2F'  },
+  {id:77,l:'1I',  v:null  }, // vis = Mejor 3° (C/D/F/G/H)
+  {id:78,l:'2E',  v:'2I'  },
+  {id:79,l:'1A',  v:null  }, // vis = Mejor 3° (C/E/F/H/I)
+  {id:80,l:'1L',  v:null  }, // vis = Mejor 3° (E/H/I/J/K)
+  {id:81,l:'1D',  v:null  }, // vis = Mejor 3° (B/E/F/I/J)
+  {id:82,l:'1G',  v:null  }, // vis = Mejor 3° (A/E/H/I/J)
+  {id:83,l:'2K',  v:'2L'  },
+  {id:84,l:'1H',  v:'2J'  },
+  {id:85,l:'1B',  v:null  }, // vis = Mejor 3° (E/F/G/I/J)
+  {id:86,l:'1J',  v:'2H'  },
+  {id:87,l:'1K',  v:null  }, // vis = Mejor 3° (D/E/I/J/L)
+  {id:88,l:'2D',  v:'2G'  },
+];
+
+// Grupos permitidos para cada slot de Mejor 3°
+const SLOTS_3RD = [
+  [74, ['A','B','C','D','F']],
+  [77, ['C','D','F','G','H']],
+  [79, ['C','E','F','H','I']],
+  [80, ['E','H','I','J','K']],
+  [81, ['B','E','F','I','J']],
+  [82, ['A','E','H','I','J']],
+  [85, ['E','F','G','I','J']],
+  [87, ['D','E','I','J','L']],
+];
+
+// Mapa completo de rondas eliminatorias: [matchId, [localFromId, 'W'|'L'], [visFromId, 'W'|'L']]
+const BRACKET_KNOCKOUT = [
+  [89, [74,'W'],[77,'W']], [90, [73,'W'],[75,'W']],
+  [91, [76,'W'],[78,'W']], [92, [79,'W'],[80,'W']],
+  [93, [83,'W'],[84,'W']], [94, [81,'W'],[82,'W']],
+  [95, [86,'W'],[88,'W']], [96, [85,'W'],[87,'W']],
+  [97, [89,'W'],[90,'W']], [98, [93,'W'],[94,'W']],
+  [99, [91,'W'],[92,'W']], [100,[95,'W'],[96,'W']],
+  [101,[97,'W'],[98,'W']], [102,[99,'W'],[100,'W']],
+  [103,[101,'L'],[102,'L']], // 3er puesto
+  [104,[101,'W'],[102,'W']], // Final
+];
+
+let _bracketTimer = null;
+function scheduleBracketUpdate() {
+  if (_bracketTimer) clearTimeout(_bracketTimer);
+  _bracketTimer = setTimeout(computeAndUpdateBracket, 4000);
+}
+
+async function computeAndUpdateBracket() {
+  try {
+    const [allPartidos, allResultados] = await Promise.all([
+      sbRest('/partidos?select=id,etapa,local,visitante,codigo_local,codigo_vis&order=id'),
+      sbRest('/resultados?select=partido_id,goles_local,goles_vis'),
+    ]);
+    if (!allPartidos || !allResultados) return;
+
+    const resMap = {};
+    for (const r of allResultados) resMap[r.partido_id] = r;
+
+    // ── 1. Clasificaciones por grupo ──────────────────────────────
+    const groups = {};
+    for (const m of allPartidos.filter(m => m.id >= 1 && m.id <= 72)) {
+      const letter = m.etapa.replace('Grupo ', '');
+      if (!groups[letter]) groups[letter] = {};
+      for (const [name, code] of [[m.local, m.codigo_local], [m.visitante, m.codigo_vis]]) {
+        if (!groups[letter][name]) groups[letter][name] = { nombre: name, codigo: code || '', pts: 0, gf: 0, ga: 0, gd: 0, played: 0 };
+      }
+      const res = resMap[m.id];
+      if (res) {
+        const l = groups[letter][m.local], v = groups[letter][m.visitante];
+        const gl = res.goles_local, gv = res.goles_vis;
+        l.played++; v.played++;
+        l.gf += gl; l.ga += gv; l.gd = l.gf - l.ga;
+        v.gf += gv; v.ga += gl; v.gd = v.gf - v.ga;
+        if (gl > gv) l.pts += 3; else if (gl < gv) v.pts += 3; else { l.pts++; v.pts++; }
+      }
+    }
+    const sortedGroups = {};
+    for (const [g, teams] of Object.entries(groups)) {
+      sortedGroups[g] = Object.values(teams).sort((a, b) =>
+        b.pts - a.pts || b.gd - a.gd || b.gf - a.gf || a.nombre.localeCompare(b.nombre)
+      );
+    }
+
+    // ── 2. Asignación de Mejores 3° ────────────────────────────────
+    const all3rds = Object.entries(sortedGroups)
+      .filter(([, t]) => t.length >= 3)
+      .map(([g, t]) => ({ group: g, team: t[2] }))
+      .sort((a, b) => b.team.pts - a.team.pts || b.team.gd - a.team.gd || b.team.gf - a.team.gf || a.group.localeCompare(b.group));
+
+    const assigned3rd = {}, used3rd = new Set();
+    for (const [mId, allowed] of SLOTS_3RD) {
+      const c = all3rds.find(x => allowed.includes(x.group) && !used3rd.has(x.group));
+      if (c) { assigned3rd[mId] = c.team; used3rd.add(c.group); }
+    }
+
+    // ── 3. Resolver dieciseisavos ─────────────────────────────────
+    const byId = {};
+    for (const p of allPartidos) byId[p.id] = p;
+
+    const getGroup = slot => {
+      const m = slot && slot.match(/^([12])([A-L])$/);
+      return m ? (sortedGroups[m[2]]?.[parseInt(m[1]) - 1] || null) : null;
+    };
+
+    const updates = [];
+
+    for (const entry of BRACKET_D16) {
+      const p = byId[entry.id]; if (!p) continue;
+      const localTeam = getGroup(entry.l);
+      const visTeam   = entry.v ? getGroup(entry.v) : assigned3rd[entry.id];
+
+      const nl  = localTeam ? localTeam.nombre : p.local;
+      const nv  = visTeam   ? visTeam.nombre   : p.visitante;
+      const ncl = localTeam ? (localTeam.codigo || null) : p.codigo_local;
+      const ncv = visTeam   ? (visTeam.codigo   || null) : p.codigo_vis;
+
+      if ((nl !== p.local || nv !== p.visitante) && !isPlaceholder(nl) || !isPlaceholder(nv)) {
+        if (nl !== p.local || nv !== p.visitante || ncl !== p.codigo_local || ncv !== p.codigo_vis) {
+          updates.push({ id: entry.id, local: nl, visitante: nv, codigo_local: ncl, codigo_vis: ncv });
+          p.local = nl; p.visitante = nv; p.codigo_local = ncl; p.codigo_vis = ncv;
+        }
+      }
+    }
+
+    // ── 4. Resolver octavos → final desde resultados ──────────────
+    const getWL = (fromId, wl) => {
+      const partido = byId[fromId]; const res = resMap[fromId];
+      if (!partido || !res) return null;
+      if (res.goles_local === res.goles_vis) return null; // empate: no resolver (necesita penales)
+      const localGana = res.goles_local > res.goles_vis;
+      const takeLocal = wl === 'W' ? localGana : !localGana;
+      return { nombre: takeLocal ? partido.local : partido.visitante, codigo: takeLocal ? partido.codigo_local : partido.codigo_vis };
+    };
+
+    for (const [matchId, [lFrom, lWL], [vFrom, vWL]] of BRACKET_KNOCKOUT) {
+      const p = byId[matchId]; if (!p) continue;
+      const localTeam = getWL(lFrom, lWL);
+      const visTeam   = getWL(vFrom, vWL);
+      if (!localTeam && !visTeam) continue;
+
+      const nl  = localTeam ? localTeam.nombre  : p.local;
+      const nv  = visTeam   ? visTeam.nombre    : p.visitante;
+      const ncl = localTeam ? (localTeam.codigo || null) : p.codigo_local;
+      const ncv = visTeam   ? (visTeam.codigo   || null) : p.codigo_vis;
+
+      if (nl !== p.local || nv !== p.visitante || ncl !== p.codigo_local || ncv !== p.codigo_vis) {
+        updates.push({ id: matchId, local: nl, visitante: nv, codigo_local: ncl, codigo_vis: ncv });
+        p.local = nl; p.visitante = nv; p.codigo_local = ncl; p.codigo_vis = ncv;
+      }
+    }
+
+    // ── 5. Aplicar updates a Supabase ─────────────────────────────
+    if (updates.length === 0) { console.log('[bracket] Sin cambios en eliminatorias'); return; }
+
+    for (const u of updates) {
+      await sbRest(`/partidos?id=eq.${u.id}`, 'PATCH', {
+        local: u.local, visitante: u.visitante,
+        codigo_local: u.codigo_local, codigo_vis: u.codigo_vis,
+      });
+    }
+    console.log(`[bracket] ${updates.length} partido(s) actualizados:`, updates.map(u => `#${u.id} ${u.local} vs ${u.visitante}`).join(' | '));
+  } catch (e) {
+    console.error('[bracket]', e.message);
+  }
+}
+
 // ── API routes ────────────────────────────────────────────────────
 app.get('/config.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
@@ -547,6 +722,18 @@ app.get('/api/live', async (req, res) => {
   res.json({ ok: true, ts: Date.now(), resultados: data || [] });
 });
 
+// Bracket: fuerza recomputo y retorna partidos de eliminatorias con equipos resueltos
+app.get('/api/bracket', async (req, res) => {
+  try {
+    await computeAndUpdateBracket();
+    const [partidos, resultados] = await Promise.all([
+      sbRest('/partidos?id=gte.73&select=id,etapa,fecha,hora,local,visitante,codigo_local,codigo_vis,ciudad&order=id'),
+      sbRest('/resultados?select=partido_id,goles_local,goles_vis,goleadores,tarjetas'),
+    ]);
+    res.json({ ok: true, partidos: partidos || [], resultados: resultados || [] });
+  } catch(e) { res.json({ ok: false, error: e.message }); }
+});
+
 // Debug: qué retornan las fuentes sin guardar nada — abre en el navegador para diagnosticar
 app.get('/api/debug-live', async (req, res) => {
   const date = colDate(), dateNum = colDateNum();
@@ -623,6 +810,9 @@ if (SUPABASE_URL && SUPABASE_ANON) {
   // Rellenar goleadores históricos vacíos al arrancar y cada 3h
   setTimeout(resyncMissingGoals, 12_000);
   setInterval(resyncMissingGoals, 3 * 60 * 60 * 1000);
+  // Bracket: calcular avance de equipos al arrancar y cada hora
+  setTimeout(computeAndUpdateBracket, 8_000);
+  setInterval(computeAndUpdateBracket, 60 * 60 * 1000);
 } else {
   console.log('[live] sin Supabase — modo offline');
 }

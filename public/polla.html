@@ -1173,6 +1173,32 @@ function setupRealtimeFases() {
 }
 setupRealtimeFases();
 
+// Realtime: cuando el servidor actualiza los nombres de equipos en partidos de eliminatorias
+let _rtPartidos = null, _rtPartidosN = 0;
+function setupRealtimePartidos() {
+  if (_rtPartidos) try { sb.removeChannel(_rtPartidos); } catch {}
+  _rtPartidos = sb.channel('partidos-live-' + (++_rtPartidosN))
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'partidos' }, payload => {
+      if (!payload.new) return;
+      const updated = payload.new;
+      const idx = MATCHES.findIndex(m => m.id === updated.id);
+      if (idx !== -1) {
+        MATCHES[idx] = { ...MATCHES[idx], ...updated };
+      }
+      // Re-renderizar la vista activa para mostrar los nuevos nombres de equipos
+      const activeTab = document.querySelector('nav button.on')?.dataset?.tab;
+      if (activeTab === 'apuestas') renderBets();
+      else if (activeTab === 'resultados') renderRes();
+      else if (activeTab === 'colombia') renderColombia();
+    })
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        setTimeout(setupRealtimePartidos, 5000);
+      }
+    });
+}
+setupRealtimePartidos();
+
 init();
 </script>
 <script src="/music-player.js"></script>
