@@ -427,14 +427,14 @@ const BRACKET_D16 = [
 
 // Grupos permitidos para cada slot de Mejor 3°
 const SLOTS_3RD = [
-  [74, ['A','B','C','D','F']],
-  [77, ['C','D','F','G','H']],
-  [79, ['C','E','F','H','I']],
-  [80, ['E','H','I','J','K']],
-  [81, ['B','E','F','I','J']],
-  [82, ['A','E','H','I','J']],
-  [85, ['E','F','G','I','J']],
-  [87, ['D','E','I','J','L']],
+  [74, ['D']],  // Paraguay (3° Grupo D) → Alemania vs Paraguay
+  [77, ['F']],  // Suecia   (3° Grupo F) → Francia vs Suecia
+  [79, ['E']],  // Ecuador  (3° Grupo E) → México vs Ecuador
+  [80, ['K']],  // RD Congo (3° Grupo K) → Inglaterra vs RD Congo
+  [81, ['B']],  // Bosnia   (3° Grupo B) → EE.UU. vs Bosnia y Herzegovina
+  [82, ['I']],  // Senegal  (3° Grupo I) → Bélgica vs Senegal
+  [85, ['J']],  // Argelia  (3° Grupo J) → Suiza vs Argelia
+  [87, ['L']],  // Ghana    (3° Grupo L) → Colombia vs Ghana
 ];
 
 // Mapa completo de rondas eliminatorias: [matchId, [localFromId, 'W'|'L'], [visFromId, 'W'|'L']]
