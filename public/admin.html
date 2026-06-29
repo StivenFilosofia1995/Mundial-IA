@@ -3,771 +3,774 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — La Polla NODO 2026</title>
+<title>ADMIN — Polla NODO 2026</title>
+<script src="/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --nodo:#001166;--nodo2:#0022aa;--am:#FCD116;--ro:#CE1126;
-  --w:#fff;--paper:#f4f6fb;--ink:#0a0e1a;--grey:#6b7280;
-  --green:#15803d;--red:#dc2626;--border:rgba(0,17,102,.12);
+  --nodo:#001166;--nodo-mid:#0022aa;--amarillo:#FCD116;--rojo:#CE1126;
+  --blanco:#ffffff;--paper:#f4f6fb;--card:#ffffff;--grey:#6b7280;--ink:#0a0e1a;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,sans-serif;font-size:14px}
+body{background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif}
+.tricolor{height:5px;background:linear-gradient(90deg,var(--amarillo) 0 40%,var(--nodo) 40% 70%,var(--rojo) 70% 100%)}
 
-/* PIN GATE */
-#gate{position:fixed;inset:0;background:var(--nodo);display:flex;align-items:center;justify-content:center;z-index:999}
-.gc{background:var(--w);border-radius:14px;padding:40px 36px;max-width:360px;width:90%;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.45)}
-.gc .icon{font-size:48px;margin-bottom:14px}
-.gc h2{font-size:22px;font-weight:800;margin-bottom:6px}
-.gc p{color:var(--grey);font-size:13px;margin-bottom:22px}
-.gc input{width:100%;padding:13px;border:2px solid var(--border);border-radius:8px;font-size:20px;text-align:center;letter-spacing:6px;outline:none;margin-bottom:12px;transition:border .2s}
-.gc input:focus{border-color:var(--nodo)}
-.gc .btn-enter{width:100%;padding:13px;background:var(--nodo);color:var(--w);border:none;border-radius:8px;font-size:15px;font-weight:800;cursor:pointer;letter-spacing:.04em;transition:background .15s}
-.gc .btn-enter:hover{background:var(--nodo2)}
-.pin-err{color:var(--red);font-size:12px;margin-top:8px;min-height:18px}
+/* LOGIN */
+#login-screen{position:fixed;inset:0;z-index:100;background:var(--nodo);display:flex;align-items:center;justify-content:center}
+.login-box{text-align:center;padding:40px;border:3px solid var(--amarillo);box-shadow:8px 8px 0 rgba(0,0,0,.3);background:rgba(255,255,255,.05);max-width:360px;width:90%}
+.login-box .logo{font-family:'Archivo Black',sans-serif;font-size:28px;color:var(--blanco);letter-spacing:-.01em;margin-bottom:4px}
+.login-box .logo em{color:var(--amarillo);font-style:normal}
+.login-box .sub{font-family:'Spline Sans Mono',monospace;font-size:10px;color:rgba(255,255,255,.4);letter-spacing:.2em;text-transform:uppercase;margin-bottom:28px}
+.login-box .lock{font-size:36px;margin-bottom:16px}
+#passInput{font-family:monospace;font-size:15px;border:2px solid var(--amarillo);padding:12px 14px;background:rgba(255,255,255,.1);color:var(--blanco);width:100%;border-radius:2px;outline:none;margin-bottom:12px;letter-spacing:.05em}
+#passInput::placeholder{color:rgba(255,255,255,.3);letter-spacing:.02em}
+#btnLogin{font-family:'Spline Sans Mono',monospace;font-size:12px;font-weight:700;background:var(--amarillo);color:var(--nodo);border:none;padding:13px 16px;cursor:pointer;width:100%;text-transform:uppercase;letter-spacing:.1em;box-shadow:4px 4px 0 rgba(0,0,0,.2);transition:all .15s}
+#btnLogin:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 rgba(0,0,0,.25)}
+#loginError{color:#ffb3ba;font-family:monospace;font-size:11px;margin-top:12px;display:none;letter-spacing:.04em}
+.login-back{font-family:monospace;font-size:11px;color:rgba(255,255,255,.3);margin-top:20px;cursor:pointer;text-decoration:underline;display:block}
+.login-back:hover{color:rgba(255,255,255,.6)}
 
 /* HEADER */
-header{background:var(--nodo);color:var(--w);padding:13px 20px;display:flex;align-items:center;gap:14px;border-bottom:4px solid var(--am)}
-header h1{font-size:18px;font-weight:800;letter-spacing:.04em}
-header h1 span{color:var(--am)}
-.priv{background:var(--ro);color:var(--w);font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.1em}
-header .sp{flex:1}
-.ts{font-size:11px;color:rgba(255,255,255,.45);font-family:monospace}
+header{background:var(--nodo);color:var(--blanco);padding:14px 4vw;display:flex;align-items:center;gap:14px;border-bottom:4px solid var(--amarillo);flex-wrap:wrap}
+.nodo-icon{width:36px;height:36px;background:var(--blanco);border-radius:3px;display:flex;align-items:center;justify-content:center;flex:none}
+.nodo-icon svg{width:24px;height:24px}
+.head-title{font-family:'Archivo Black',sans-serif;font-size:clamp(16px,2.5vw,24px);color:var(--blanco);letter-spacing:-.01em}
+.head-title em{color:var(--amarillo);font-style:normal}
+.admin-badge{background:var(--rojo);color:var(--blanco);font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;padding:3px 10px;border-radius:2px}
+.head-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{font-family:'Spline Sans Mono',monospace;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;border:2px solid var(--nodo);background:var(--card);color:var(--nodo);padding:8px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--nodo);transition:all .1s}
+.btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--nodo)}
+.btn.primary{background:var(--amarillo)}
+.btn.danger{background:var(--rojo);border-color:var(--rojo);color:var(--blanco);box-shadow:3px 3px 0 rgba(0,0,0,.3)}
+.btn.blue{background:var(--nodo);color:var(--blanco);border-color:var(--nodo-mid)}
+.btn.blue:hover{box-shadow:4px 4px 0 rgba(0,0,30,.4)}
+.btn-logout{font-family:'Spline Sans Mono',monospace;font-size:11px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1.5px solid rgba(255,255,255,.2);padding:7px 14px;cursor:pointer;border-radius:3px;transition:all .15s}
+.btn-logout:hover{background:rgba(255,255,255,.2)}
 
-/* NAV */
-nav{display:flex;background:var(--w);border-bottom:3px solid var(--nodo);position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,17,102,.1)}
-nav button{padding:13px 20px;background:none;border:none;border-right:1px solid var(--border);font-size:13px;font-weight:700;cursor:pointer;color:var(--grey);text-transform:uppercase;letter-spacing:.04em;transition:all .15s}
-nav button.on{background:var(--nodo);color:var(--am)}
-nav button:hover:not(.on){background:var(--paper)}
+/* TOOLBAR */
+.toolbar{background:var(--blanco);border-bottom:2px solid rgba(0,17,102,.1);padding:12px 4vw;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:10}
+.toolbar select{font-family:'Spline Sans Mono',monospace;font-size:11px;border:2px solid var(--nodo);padding:7px 10px;background:var(--card);color:var(--ink);border-radius:0;outline:none}
+.sync-status{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);margin-left:auto}
 
-/* LAYOUT */
-main{padding:22px 20px 80px;max-width:1240px;margin:0 auto}
-.view{display:none}.view.on{display:block}
+/* GRID */
+main{padding:20px 4vw 80px;max-width:1240px;margin:0 auto}
+h2{font-family:'Archivo Black',sans-serif;font-size:22px;color:var(--nodo);margin-bottom:4px}
+.note{font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey);margin-bottom:16px;letter-spacing:.06em;text-transform:uppercase}
+.bets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.bet-card{background:var(--card);border:2px solid var(--nodo);box-shadow:3px 3px 0 var(--nodo);padding:14px}
+.bet-card.saved{border-left:5px solid #15803d}
+.bet-card.saving{border-color:var(--amarillo);box-shadow:3px 3px 0 var(--amarillo)}
+.bet-card.live{border-color:var(--rojo);box-shadow:3px 3px 0 var(--rojo);border-left:5px solid var(--rojo)}
+.bet-top{display:flex;justify-content:space-between;align-items:center;font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--grey);margin-bottom:10px;gap:6px;flex-wrap:wrap}
+.stage{background:var(--nodo);color:var(--blanco);padding:2px 7px;font-size:9px;flex:none}
+.bet-teams{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bt{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14px;min-width:0;flex:1}
+.bt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bt.right{flex-direction:row-reverse;text-align:right}
+.score-in{width:44px;text-align:center;font-family:'Archivo Black',sans-serif;font-size:20px;padding:5px 2px;border:2px solid var(--nodo);background:var(--paper);flex:none}
+.score-sep{font-family:'Archivo Black',sans-serif;font-size:20px;color:var(--grey);flex:none;padding:0 2px}
+.flag{width:28px;height:20px;object-fit:cover;border:1px solid rgba(0,17,102,.2);flex:none;border-radius:1px}
+.flag-tbd{width:28px;height:20px;border:1px dashed var(--grey);display:inline-flex;align-items:center;justify-content:center;font-size:7px;flex:none;background:#e8eaf0;color:var(--grey)}
+input[type="number"],input[type="text"]{font-family:'Spline Sans Mono',monospace;font-size:12px;border:2px solid var(--nodo);padding:8px 10px;background:var(--card);color:var(--ink);border-radius:0;outline:none}
+footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:14px 4vw;font-family:'Spline Sans Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.loading{text-align:center;padding:40px;font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--grey)}
+@keyframes livepulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
 
-/* CARD */
-.card{background:var(--w);border-radius:10px;border:1px solid var(--border);padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,17,102,.06)}
-.ct{font-size:15px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
-.cs{font-size:12px;color:var(--grey);margin-bottom:16px}
+/* GOLEADORES */
+.gol-builder{margin-top:8px}
+.gol-rows{display:flex;flex-direction:column;gap:5px}
+.gol-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:#f0f4ff;border:1px solid rgba(0,17,102,.12);padding:5px 7px}
+.gol-row .gol-name{flex:1;min-width:110px;font-family:'Spline Sans Mono',monospace;font-size:11px;border:1.5px solid rgba(0,17,102,.25);background:#fff;padding:3px 7px;color:var(--ink)}
+.gol-row .gol-min{width:50px;font-family:'Spline Sans Mono',monospace;font-size:11px;border:1.5px solid rgba(0,17,102,.25);background:#fff;padding:3px 5px;text-align:center;color:var(--ink)}
+.gol-chk{font-family:'Spline Sans Mono',monospace;font-size:10px;display:flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap;color:#374151}
+.gol-del{background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;font-weight:700;line-height:1;padding:0 4px;flex:none}
+.btn-add-gol{font-family:'Spline Sans Mono',monospace;font-size:10px;font-weight:700;border:1.5px dashed rgba(0,17,102,.35);background:transparent;color:var(--nodo);padding:4px 10px;cursor:pointer;margin-top:5px;letter-spacing:.05em;width:100%}
+.btn-add-gol:hover{background:#f0f4ff}
 
-/* PHASES GRID */
-.phases{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
-.ph{background:var(--w);border-radius:10px;border:2px solid var(--border);padding:20px;transition:border .2s}
-.ph.conf{border-color:#22c55e}
-.ph-hd{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
-.ph-icon{font-size:22px}
-.ph-name{font-size:15px;font-weight:800}
-.ph-meta{font-size:11px;color:var(--grey)}
-.ok-badge{background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
-.no-badge{background:#fee2e2;color:#dc2626;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
-.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px;min-height:32px}
-.tag{background:var(--paper);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px}
-.ph-acts{display:flex;gap:8px;flex-wrap:wrap}
+/* TARJETAS */
+.card-builder{margin-top:8px}
+.card-rows{display:flex;flex-direction:column;gap:5px}
+.card-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:#fff8f0;border:1px solid rgba(206,17,38,.18);padding:5px 7px}
+.card-row .card-name{flex:1;min-width:110px;font-family:'Spline Sans Mono',monospace;font-size:11px;border:1.5px solid rgba(206,17,38,.25);background:#fff;padding:3px 7px;color:var(--ink)}
+.card-row .card-min{width:50px;font-family:'Spline Sans Mono',monospace;font-size:11px;border:1.5px solid rgba(206,17,38,.25);background:#fff;padding:3px 5px;text-align:center;color:var(--ink)}
+.card-row .card-type{font-family:'Spline Sans Mono',monospace;font-size:11px;border:1.5px solid rgba(206,17,38,.25);background:#fff;padding:3px 5px;color:var(--ink);cursor:pointer}
+.section-sep{font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-top:10px;margin-bottom:4px;padding-top:8px;border-top:1px dashed rgba(0,17,102,.12);display:flex;align-items:center;gap:6px}
+.tc{display:inline-block;width:9px;height:13px;border-radius:1px;vertical-align:middle;flex:none;box-shadow:1px 1px 0 rgba(0,0,0,.28)}
+.tc-y{background:#FCD116}.tc-r{background:#CE1126}
 
-/* EDIT AREA */
-.ea{display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px}
-.ea.open{display:block}
-.ea textarea{width:100%;height:170px;padding:10px;border:2px solid var(--border);border-radius:6px;font-size:12px;resize:vertical;line-height:1.7;outline:none}
-.ea textarea:focus{border-color:var(--nodo)}
-.ea-hint{font-size:11px;color:var(--grey);margin:4px 0 10px}
+/* LIVE BADGE */
+.badge-live{background:var(--rojo);color:#fff;font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;letter-spacing:.06em;animation:blink 1.2s infinite}
+.badge-done{background:#16a34a;color:#fff;font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;letter-spacing:.06em}
+.badge-soon{background:#f59e0b;color:#fff;font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;letter-spacing:.06em}
+.badge-locked{background:#475569;color:#fff;font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;letter-spacing:.06em}
 
-/* BUTTONS */
-.btn{padding:8px 15px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;border:none;letter-spacing:.03em;text-transform:uppercase;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.b-pri{background:var(--nodo);color:var(--w)}.b-pri:hover:not(:disabled){background:var(--nodo2)}
-.b-ok{background:#16a34a;color:var(--w)}.b-ok:hover:not(:disabled){background:var(--green)}
-.b-del{background:var(--red);color:var(--w)}.b-del:hover:not(:disabled){background:#b91c1c}
-.b-warn{background:#f59e0b;color:var(--w)}.b-warn:hover:not(:disabled){background:#d97706}
-.b-ghost{background:transparent;color:var(--grey);border:1px solid var(--border)}.b-ghost:hover:not(:disabled){background:var(--paper);color:var(--ink)}
-.b-sm{padding:5px 10px;font-size:11px}
-
-/* TABLE */
-.tbl-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse}
-th{background:var(--nodo);color:var(--am);padding:10px 12px;text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
-td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px}
-tbody tr:hover td{background:#f8f9ff}
-.tn{text-align:right;font-family:monospace;font-weight:700}
-.inp{padding:6px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px;width:100%;min-width:80px;outline:none}
-.inp:focus{border-color:var(--nodo)}
-.inp-sc{width:50px;text-align:center;padding:6px 4px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px}
-.dg{background:#22c55e}.dgr{background:#d1d5db}
-
-/* MODAL */
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:300}
-#modal.open{display:flex}
-.mc{background:var(--w);border-radius:12px;padding:28px;max-width:420px;width:92%;box-shadow:0 24px 64px rgba(0,0,0,.3)}
-.mc h3{font-size:17px;font-weight:800;color:var(--red);margin-bottom:10px}
-.mc p{color:var(--grey);font-size:13px;line-height:1.6;margin-bottom:20px}
-.mc-acts{display:flex;gap:8px;justify-content:flex-end}
-
-/* LOG */
-.log{background:#0a0e1a;color:#4ade80;font-family:monospace;font-size:11px;padding:14px;border-radius:8px;height:200px;overflow-y:auto;line-height:1.8}
-.le{color:#f87171}.li{color:#93c5fd}
-
-/* TOAST */
-#toast{position:fixed;bottom:22px;right:22px;background:#0f172a;color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,0,0,.3);transform:translateY(100px);opacity:0;transition:all .25s;z-index:400;max-width:320px;pointer-events:none}
-#toast.show{transform:translateY(0);opacity:1}
-#toast.ok{border-left:4px solid #22c55e}
-#toast.err{border-left:4px solid #ef4444}
-
-/* ACTIONS GRID */
-.ag{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-.ac{background:var(--w);border-radius:10px;border:1px solid var(--border);padding:24px;text-align:center}
-.ac .ai{font-size:38px;margin-bottom:12px}
-.ac h3{font-size:15px;font-weight:800;margin-bottom:6px}
-.ac p{font-size:12px;color:var(--grey);margin-bottom:16px;line-height:1.5}
-
-/* RANK ROWS */
-.r1 td{background:#fefce8!important}.r2 td{background:#f8fafc!important}.r3 td{background:#fff7ed!important}
-.detail-row td{padding:0!important}
-.detail-body{padding:14px 18px;background:#f0f4ff;border-top:2px dashed #c7d2fe}
-
-@media(max-width:600px){.phases{grid-template-columns:1fr}.ag{grid-template-columns:1fr}}
+/* TABLERO EN VIVO */
+.live-board{background:var(--nodo);padding:20px 4vw 24px;border-bottom:4px solid var(--amarillo)}
+.live-board-head{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.live-board-head h2{font-family:'Archivo Black',sans-serif;font-size:18px;color:var(--amarillo);letter-spacing:-.01em}
+.live-board-head .live-dot{width:10px;height:10px;background:var(--rojo);border-radius:50%;animation:livepulse 1s infinite;flex:none}
+.live-board-head .last-upd{font-family:'Spline Sans Mono',monospace;font-size:9px;color:rgba(255,255,255,.35);margin-left:auto;letter-spacing:.1em;text-transform:uppercase}
+.podio-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:900px;margin-bottom:16px}
+.podio-card{border:2px solid rgba(255,255,255,.15);padding:14px 12px;text-align:center;position:relative;transition:all .3s}
+.podio-card.pos-1{background:rgba(252,209,22,.18);border-color:var(--amarillo);box-shadow:0 0 16px rgba(252,209,22,.25)}
+.podio-card.pos-2{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.35)}
+.podio-card.pos-3{background:rgba(206,17,38,.12);border-color:rgba(206,17,38,.4)}
+.podio-medal{font-size:26px;line-height:1;margin-bottom:6px}
+.podio-name{font-family:'Archivo Black',sans-serif;font-size:14px;color:var(--blanco);line-height:1.15;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.podio-pts{font-family:'Archivo Black',sans-serif;font-size:24px;color:var(--amarillo);line-height:1}
+.podio-sub{font-family:'Spline Sans Mono',monospace;font-size:10px;color:rgba(255,255,255,.55);margin-top:4px;line-height:1.6}
+.podio-pesos{font-family:'Spline Sans Mono',monospace;font-size:12px;font-weight:700;color:#4ade80;margin-top:4px}
+.ltable{width:100%;max-width:900px;border-collapse:collapse}
+.ltable th{font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,.4);padding:5px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.1)}
+.ltable td{padding:7px 10px;font-size:12px;color:rgba(255,255,255,.85);border-bottom:1px solid rgba(255,255,255,.05)}
+.ltable td.r,.ltable th.r{text-align:right;font-family:'Spline Sans Mono',monospace}
+.ltable tr.pos-1 td{background:rgba(252,209,22,.08)}
+.ltable tr.pos-2 td{background:rgba(255,255,255,.03)}
+.ltable tr.pos-3 td{background:rgba(206,17,38,.05)}
+.ltable .money-col{color:#4ade80;font-weight:700}
+.ltable .dim{color:rgba(255,255,255,.3)}
+.manual-head{display:flex;align-items:center;gap:14px;margin-bottom:6px;flex-wrap:wrap;padding-bottom:10px;border-bottom:2px solid rgba(0,17,102,.15)}
+.manual-badge{background:var(--amarillo);color:var(--nodo);font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;padding:3px 10px}
+.gol-input{font-family:'Spline Sans Mono',monospace !important;font-size:11px !important;border:1.5px solid rgba(0,17,102,.25) !important;background:#f8f9ff !important;padding:6px 10px !important;width:100%;display:block;margin-top:8px}
+@media(max-width:600px){.podio-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="tricolor"></div>
 
-<!-- PIN GATE -->
-<div id="gate">
-  <div class="gc">
-    <div class="icon">⚙️</div>
-    <h2>Panel Admin</h2>
-    <p>La Polla NODO — Mundial 2026</p>
-    <label for="pin-input" style="display:none">PIN de acceso</label>
-    <input type="password" id="pin-input" aria-label="PIN de acceso" placeholder="••••••••" maxlength="20"
-           onkeydown="if(event.key==='Enter')checkPin()">
-    <button class="btn-enter" onclick="checkPin()">Entrar →</button>
-    <div class="pin-err" id="pin-err"></div>
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="lock">🔐</div>
+    <div class="logo">POLLA <em>NODO</em></div>
+    <div class="sub">Panel de Administrador</div>
+    <input type="password" id="passInput" placeholder="Contraseña de acceso"
+      onkeypress="if(event.key==='Enter') doLogin()">
+    <button id="btnLogin" onclick="doLogin()">Acceder al panel</button>
+    <div id="loginError">Contraseña incorrecta — inténtalo de nuevo</div>
+    <a class="login-back" href="/polla.html">← Volver a La Polla</a>
   </div>
 </div>
 
-<!-- APP -->
-<div id="app" style="display:none">
+<!-- PANEL ADMIN (oculto hasta login) -->
+<div id="admin-panel" style="display:none">
   <header>
-    <h1>⚙️ Admin <span>NODO</span></h1>
-    <span class="priv">PRIVADO</span>
-    <span class="sp"></span>
-    <span class="ts" id="last-load">—</span>
+    <div class="nodo-icon">
+      <svg viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="30" height="30" fill="#001166" rx="2"/>
+        <path d="M6 22V8h3.6l8.4 9.6V8H22v14h-3.6L10 12.4V22H6z" fill="white"/>
+      </svg>
+    </div>
+    <span class="head-title">ADMIN <em>POLLA 2026</em></span>
+    <span class="admin-badge">🔒 Admin</span>
+    <div class="head-actions">
+      <a href="/polla.html" style="text-decoration:none"><button class="btn blue">← Ver La Polla</button></a>
+      <button class="btn-logout" onclick="doLogout()">Cerrar sesión admin</button>
+    </div>
   </header>
-  <nav>
-    <button class="on" onclick="switchTab('llaves',this)">🏆 Llaves</button>
-    <button onclick="switchTab('partidos',this)">⚽ Partidos</button>
-    <button onclick="switchTab('usuarios',this)">👥 Usuarios</button>
-    <button onclick="switchTab('acciones',this)">🔄 Acciones</button>
-  </nav>
-  <main>
 
-    <!-- LLAVES -->
-    <div id="view-llaves" class="view on">
-      <div class="card">
-        <div class="ct">🏆 Gestión de Fases Eliminatorias</div>
-        <div class="cs">Confirma qué equipos avanzan a cada ronda. Los puntos se recalculan automáticamente para todos los participantes.</div>
-      </div>
-      <div class="phases" id="phases-wrap">
-        <div style="padding:20px;color:var(--grey)">Cargando...</div>
-      </div>
+  <!-- TABLERO EN VIVO -->
+  <div class="live-board" id="liveBoard">
+    <div class="live-board-head">
+      <div class="live-dot"></div>
+      <h2>TABLERO EN VIVO — ¿QUIÉN VA GANANDO?</h2>
+      <button onclick="loadLeaderboard()" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1.5px solid rgba(255,255,255,.2);font-family:'Spline Sans Mono',monospace;font-size:10px;padding:4px 10px;cursor:pointer;border-radius:3px">↻ Actualizar</button>
+      <span class="last-upd" id="lastUpd">Cargando…</span>
     </div>
-
-    <!-- PARTIDOS -->
-    <div id="view-partidos" class="view">
-      <div class="card">
-        <div class="ct">⚽ Partidos Eliminatorios</div>
-        <div class="cs">Edita equipos y marcadores manualmente. Guardar un marcador actualiza la tabla de posiciones en tiempo real.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap" id="rfilters">
-          <button class="btn b-pri b-sm" onclick="setRound(null,this)">Todos</button>
-          <button class="btn b-ghost b-sm" onclick="setRound('Dieciseisavos',this)">R32</button>
-          <button class="btn b-ghost b-sm" onclick="setRound('Octavos',this)">Octavos</button>
-          <button class="btn b-ghost b-sm" onclick="setRound('Cuartos',this)">Cuartos</button>
-          <button class="btn b-ghost b-sm" onclick="setRound('Semifinal',this)">Semis</button>
-          <button class="btn b-ghost b-sm" onclick="setRound('Final',this)">Final/3°</button>
-        </div>
-      </div>
-      <div id="partidos-wrap">Cargando...</div>
-    </div>
-
-    <!-- USUARIOS -->
-    <div id="view-usuarios" class="view">
-      <div class="card">
-        <div class="ct">👥 Participantes</div>
-        <div class="cs">Tabla verificada con pts partido + pts llaves. Haz clic en 👁 para ver los pronósticos de llaves. La eliminación borra todos los datos del usuario.</div>
-      </div>
-      <div id="usuarios-wrap">Cargando...</div>
-    </div>
-
-    <!-- ACCIONES -->
-    <div id="view-acciones" class="view">
-      <div class="card">
-        <div class="ct">🔄 Acciones del Sistema</div>
-        <div class="cs">Controles manuales de emergencia para sincronizar, recalcular y diagnosticar.</div>
-      </div>
-      <div class="ag">
-        <div class="ac">
-          <div class="ai">🔄</div>
-          <h3>Recalcular Bracket</h3>
-          <p>Fuerza al servidor a recalcular los equipos de cada partido eliminatorio basado en los resultados actuales.</p>
-          <button class="btn b-pri" onclick="recalcBracket()">Recalcular ahora</button>
-        </div>
-        <div class="ac">
-          <div class="ai">📡</div>
-          <h3>Sincronizar ESPN</h3>
-          <p>Fuerza una sincronización inmediata con ESPN y SofaScore para traer los últimos resultados.</p>
-          <button class="btn b-warn" onclick="syncEspn()">Sincronizar</button>
-        </div>
-        <div class="ac">
-          <div class="ai">🔍</div>
-          <h3>Diagnóstico de Puntos</h3>
-          <p>Desglose matemático exacto de cada participante: verifica exactos×3 + aciertos = pts partido.</p>
-          <button class="btn b-ghost" onclick="runDiag()">Ejecutar diagnóstico</button>
-        </div>
-        <div class="ac">
-          <div class="ai">📥</div>
-          <h3>Recargar Datos</h3>
-          <p>Recarga toda la información desde Supabase sin recargar la página.</p>
-          <button class="btn b-ghost" onclick="reloadAll()">Recargar</button>
-        </div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <div class="ct" style="margin-bottom:12px">📋 Log de actividad</div>
-        <div class="log" id="log"></div>
-      </div>
-      <div id="diag-out"></div>
-    </div>
-
-  </main>
-</div>
-
-<!-- MODAL ELIMINAR -->
-<div id="modal">
-  <div class="mc">
-    <h3>⚠️ Eliminar usuario</h3>
-    <p id="modal-body">...</p>
-    <div class="mc-acts">
-      <button class="btn b-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn b-del" id="modal-ok">Eliminar definitivamente</button>
-    </div>
+    <div class="podio-row" id="podioGrid"></div>
+    <table class="ltable" id="liveTable"></table>
   </div>
-</div>
 
-<div id="toast"></div>
+  <div class="toolbar">
+    <select id="resStage"><option value="">TODAS LAS FASES</option></select>
+    <button class="btn primary" id="btnSyncESPN" onclick="syncESPN()">🔄 Sincronizar ESPN</button>
+    <button class="btn" id="btnResync" onclick="resyncAll()" style="background:#f0f9ff;border-color:#0284c7;color:#0284c7">📋 Rellenar goleadores vacíos</button>
+    <button class="btn" onclick="renderRes()" style="background:#f0fff4;border-color:#16a34a;color:#16a34a">↻ Refrescar partidos</button>
+    <span class="sync-status" id="syncStatus">Se actualiza en tiempo real · polling ESPN cada 60s</span>
+  </div>
+
+  <main>
+    <div class="manual-head">
+      <h2>Ingreso manual de marcadores</h2>
+      <span class="manual-badge">✏️ Fallback si ESPN falla</span>
+      <span style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey)">Se guarda automático · impacta tabla y polla en tiempo real</span>
+    </div>
+    <p class="note">ESCRIBE EL MARCADOR Y GOLEADORES — SE GUARDA AUTOMÁTICO AL ESCRIBIR · 🔴 EN VIVO = partido en curso · 🔒 = apuestas bloqueadas para usuarios</p>
+    <div class="bets-grid" id="resGrid"><div class="loading">Cargando partidos…</div></div>
+
+    <!-- GESTIÓN DE LLAVES -->
+    <div style="margin-top:40px;padding-top:24px;border-top:3px solid var(--nodo)">
+      <div class="manual-head">
+        <h2>Llaves de eliminación</h2>
+        <span class="manual-badge" style="background:var(--amarillo);color:var(--nodo)">🏆 Bracket</span>
+        <span style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey)">Selecciona los equipos clasificados y confirma — los usuarios reciben puntos automáticamente</span>
+      </div>
+      <p class="note">SELECCIONA LOS EQUIPOS QUE CLASIFICARON REALMENTE · GUARDA Y CONFIRMA POR FASE · SOLO CONFIRMADAS DAN PUNTOS</p>
+      <div id="bracketAdmin"><div class="loading">Cargando…</div></div>
+    </div>
+  </main>
+
+  <footer>
+    <span>ADMIN PANEL · LA POLLA NODO · MUNDIAL 2026</span>
+    <span>SOLO USO INTERNO ☕</span>
+  </footer>
+</div>
 
 <script>
-// ── CONFIG ────────────────────────────────────────────────────────
-const SUPA = 'https://cgujihpotsuqlpmzozow.supabase.co';
-const KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNndWppaHBvdHN1cWxwbXpvem93Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTEyMzE1OCwiZXhwIjoyMDk2Njk5MTU4fQ.4pdQGH8Fl41POdQVf5N52Lccj6XkDBbojI0lh2sRDGI';
-const PIN  = 'nodo2026'; // ← Cambia esto para mayor seguridad
+const ADMIN_PASS = '854596+44';
+const sb = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
 
-const FASES = [
-  {id:'dieciseisavos',label:'Dieciseisavos',    icon:'🏅',n:32,pts:2},
-  {id:'octavos',      label:'Octavos de final',  icon:'⚽',n:16,pts:3},
-  {id:'cuartos',      label:'Cuartos de final',   icon:'🎯',n:8, pts:5},
-  {id:'semis',        label:'Semifinales',         icon:'🔥',n:4, pts:8},
-  {id:'finalistas',   label:'Finalistas',          icon:'🌟',n:2, pts:12},
-  {id:'campeon',      label:'Campeón',             icon:'🏆',n:1, pts:20},
-];
-const FASE_PTS = Object.fromEntries(FASES.map(f=>[f.id,f.pts]));
+const DAYS = ['dom','lun','mar','mié','jue','vie','sáb'];
+const flag  = (c,l) => c ? `<img class="flag" src="https://flagcdn.com/w80/${c}.png" alt="${l}">` : `<div class="flag-tbd">${(l||'').slice(0,3)||'?'}</div>`;
+const todayCOL = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+const fmtWhen  = m => { const d=new Date(m.fecha+'T12:00:00-05:00'); return `${DAYS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1} · ${m.hora}`; };
 
-// ── STATE ─────────────────────────────────────────────────────────
-const D = { fases:{}, partidos:[], resultados:{}, vtabla:[], pronFases:{} };
-let rndFilter = null;
+// Estado de un partido
+const matchStatus = m => {
+  const kickoff = new Date(m.fecha + 'T' + m.hora + ':00-05:00').getTime();
+  const mins = (Date.now() - kickoff) / 60000;
+  if (mins < -10)  return 'upcoming';   // más de 10 min para el partido
+  if (mins < 0)    return 'soon';       // menos de 10 min → apuestas bloqueadas
+  if (mins < 130)  return 'live';       // en vivo (aprox 90min + descuento/prórroga)
+  return 'done';                        // terminado
+};
 
-// ── PIN ───────────────────────────────────────────────────────────
-function checkPin() {
-  const v = (document.getElementById('pin-input').value||'').trim();
-  if (v === PIN) {
-    sessionStorage.setItem('nodo-admin','1');
-    document.getElementById('gate').style.display = 'none';
-    document.getElementById('app').style.display  = 'block';
-    init();
+const statusBadge = m => {
+  const s = matchStatus(m);
+  if (s === 'live')     return `<span class="badge-live">🔴 EN VIVO</span>`;
+  if (s === 'done')     return `<span class="badge-done">✓ JUGADO</span>`;
+  if (s === 'soon')     return `<span class="badge-soon">🔒 INICIANDO</span>`;
+  return '';
+};
+
+// ── GOLEADORES HELPERS ─────────────────────────────
+function parseGols(str) {
+  if (!str || !str.trim()) return [];
+  return str.split(' · ').map(s => {
+    const pen = s.includes('(pen)');
+    const og  = s.includes('(pp)');
+    s = s.replace(' (pen)', '').replace(' (pp)', '').trim();
+    const m = s.match(/\s(\d+)'$/);
+    const min = m ? m[1] : '';
+    const name = m ? s.slice(0, -m[0].length).trim() : s;
+    return { name, min, pen, og };
+  }).filter(g => g.name);
+}
+
+function golRowHtml(mid, g = {}) {
+  const name = (g.name || '').replace(/"/g, '&quot;');
+  return `<div class="gol-row">
+    <input class="gol-name" type="text" placeholder="Jugador" value="${name}" data-m="${mid}" data-s="gol-part">
+    <input class="gol-min" type="number" min="1" max="130" placeholder="Min" value="${g.min||''}" data-m="${mid}" data-s="gol-part">
+    <label class="gol-chk"><input type="checkbox" class="gol-pen" ${g.pen?'checked':''} data-m="${mid}" data-s="gol-part"> Pen</label>
+    <label class="gol-chk"><input type="checkbox" class="gol-og" ${g.og?'checked':''} data-m="${mid}" data-s="gol-part"> PP</label>
+    <button class="gol-del" onclick="removeGolRow(this,${mid})">×</button>
+  </div>`;
+}
+
+function serializeGols(mid) {
+  return Array.from(document.querySelectorAll(`#gol-rows-${mid} .gol-row`)).map(row => {
+    const name = row.querySelector('.gol-name').value.trim();
+    if (!name) return null;
+    const min = row.querySelector('.gol-min').value;
+    const pen = row.querySelector('.gol-pen').checked;
+    const og  = row.querySelector('.gol-og').checked;
+    return `${name}${min ? " "+min+"'" : ''}${pen ? ' (pen)' : ''}${og ? ' (pp)' : ''}`;
+  }).filter(Boolean).join(' · ');
+}
+
+window.addGolRow = mid => {
+  const rows = document.getElementById('gol-rows-' + mid);
+  if (rows) { rows.insertAdjacentHTML('beforeend', golRowHtml(mid)); }
+};
+
+window.removeGolRow = (btn, mid) => {
+  btn.closest('.gol-row').remove();
+  triggerGolSave(mid);
+};
+
+function triggerGolSave(mid) {
+  RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null, gol: '', tar: '' };
+  RESULTADOS[mid].gol = serializeGols(mid);
+  const card = document.getElementById('res-' + mid);
+  if (card) card.classList.add('saving');
+  clearTimeout(timers[mid]);
+  timers[mid] = setTimeout(() => saveResultado(mid), 800);
+}
+
+// ── TARJETAS HELPERS ───────────────────────────────
+function parseTarjetas(str) {
+  if (!str || !str.trim()) return [];
+  return str.split(' · ').map(s => {
+    s = s.trim();
+    let type = 'yellow';
+    if (s.startsWith('🟨🟥'))      { type = 'yr';     s = s.slice(4).trim(); }
+    else if (s.startsWith('🟥'))   { type = 'red';    s = s.slice(2).trim(); }
+    else if (s.startsWith('🟨'))   { type = 'yellow'; s = s.slice(2).trim(); }
+    const m = s.match(/\s(\d+)'$/);
+    const min = m ? m[1] : '';
+    const name = m ? s.slice(0, -m[0].length).trim() : s;
+    return { name, min, type };
+  }).filter(t => t.name);
+}
+
+function cardRowHtml(mid, t = {}) {
+  const name = (t.name || '').replace(/"/g, '&quot;');
+  const opt = v => `<option value="${v}" ${(t.type||'yellow')===v?'selected':''}>`
+  return `<div class="card-row">
+    <input class="card-name" type="text" placeholder="Jugador" value="${name}" data-m="${mid}" data-s="card-part">
+    <input class="card-min" type="number" min="1" max="130" placeholder="Min" value="${t.min||''}" data-m="${mid}" data-s="card-part">
+    <select class="card-type" data-m="${mid}" data-s="card-part">
+      ${opt('yellow')}🟨 Amarilla</option>
+      ${opt('red')}🟥 Roja</option>
+      ${opt('yr')}🟨🟥 2ª Amarilla</option>
+    </select>
+    <button class="gol-del" onclick="removeCardRow(this,${mid})">×</button>
+  </div>`;
+}
+
+function serializeTarjetas(mid) {
+  return Array.from(document.querySelectorAll(`#card-rows-${mid} .card-row`)).map(row => {
+    const name = row.querySelector('.card-name').value.trim();
+    if (!name) return null;
+    const min  = row.querySelector('.card-min').value;
+    const type = row.querySelector('.card-type').value;
+    const emoji = type === 'red' ? '🟥' : type === 'yr' ? '🟨🟥' : '🟨';
+    return `${emoji} ${name}${min ? ' '+min+"'" : ''}`;
+  }).filter(Boolean).join(' · ');
+}
+
+window.addCardRow = mid => {
+  const rows = document.getElementById('card-rows-' + mid);
+  if (rows) rows.insertAdjacentHTML('beforeend', cardRowHtml(mid));
+};
+
+window.removeCardRow = (btn, mid) => {
+  btn.closest('.card-row').remove();
+  triggerCardSave(mid);
+};
+
+function triggerCardSave(mid) {
+  RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null, gol: '', tar: '' };
+  RESULTADOS[mid].tar = serializeTarjetas(mid);
+  const card = document.getElementById('res-' + mid);
+  if (card) card.classList.add('saving');
+  clearTimeout(timers[mid]);
+  timers[mid] = setTimeout(() => saveResultado(mid), 800);
+}
+
+// ── LOGIN ──────────────────────────────────────────
+function doLogin() {
+  const pass = $('passInput').value;
+  if (pass === ADMIN_PASS) {
+    sessionStorage.setItem('polla-admin', '1');
+    showPanel();
   } else {
-    document.getElementById('pin-err').textContent = 'PIN incorrecto. Inténtalo de nuevo.';
-    document.getElementById('pin-input').value = '';
-    document.getElementById('pin-input').focus();
+    $('loginError').style.display = 'block';
+    $('passInput').value = '';
+    $('passInput').focus();
+    setTimeout(() => { $('loginError').style.display = 'none'; }, 3000);
   }
 }
-if (sessionStorage.getItem('nodo-admin')==='1') {
-  document.getElementById('gate').style.display = 'none';
-  document.getElementById('app').style.display  = 'block';
+
+function doLogout() {
+  sessionStorage.removeItem('polla-admin');
+  window.location.reload();
+}
+
+function showPanel() {
+  $('login-screen').style.display = 'none';
+  $('admin-panel').style.display = 'block';
   init();
+  document.dispatchEvent(new Event('admin-ready'));
 }
 
-// ── API ───────────────────────────────────────────────────────────
-const H = { apikey:KEY, Authorization:`Bearer ${KEY}`, 'Content-Type':'application/json' };
-
-async function sbGet(path) {
-  const r = await fetch(`${SUPA}/rest/v1${path}`, { headers:H });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
-}
-async function sbUpsert(path, body) {
-  const r = await fetch(`${SUPA}/rest/v1${path}`, {
-    method:'POST',
-    headers:{...H, Prefer:'resolution=merge-duplicates,return=minimal'},
-    body:JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(await r.text());
-}
-async function sbPatch(path, body) {
-  const r = await fetch(`${SUPA}/rest/v1${path}`, {
-    method:'PATCH',
-    headers:{...H, Prefer:'return=minimal'},
-    body:JSON.stringify(body),
-  });
-  if (!r.ok) throw new Error(await r.text());
-}
-async function sbDelete(path) {
-  const r = await fetch(`${SUPA}/rest/v1${path}`, {
-    method:'DELETE', headers:{...H, Prefer:'return=minimal'},
-  });
-  if (!r.ok) throw new Error(await r.text());
+if (sessionStorage.getItem('polla-admin') === '1') {
+  showPanel();
 }
 
-// ── INIT / LOAD ───────────────────────────────────────────────────
+// ── DATA ───────────────────────────────────────────
+let MATCHES = [], RESULTADOS = {};
+
 async function init() {
-  await loadAll();
-  render();
-}
-async function loadAll() {
-  logMsg('Cargando datos de Supabase...');
-  try {
-    const [fases, partidos, resultados, vtabla, pronFases] = await Promise.all([
-      sbGet('/resultados_fase?select=*'),
-      sbGet('/partidos?id=gte.73&select=*&order=id'),
-      sbGet('/resultados?partido_id=gte.73&select=*&order=partido_id'),
-      sbGet('/v_tabla?select=*&order=puntos.desc'),
-      sbGet('/pronosticos_fase?select=*'),
-    ]);
-    D.fases      = Object.fromEntries((fases||[]).map(f=>[f.fase, f]));
-    D.partidos   = partidos || [];
-    D.resultados = Object.fromEntries((resultados||[]).map(r=>[r.partido_id, r]));
-    D.vtabla     = vtabla || [];
-    D.pronFases  = {};
-    (pronFases||[]).forEach(p => {
-      D.pronFases[p.usuario_id] = D.pronFases[p.usuario_id] || {};
-      D.pronFases[p.usuario_id][p.fase] = p.equipos || [];
-    });
-    document.getElementById('last-load').textContent = 'Cargado: ' + new Date().toLocaleTimeString('es-CO');
-    logMsg('✓ ' + D.vtabla.length + ' usuarios · ' + D.partidos.length + ' partidos eliminatorios');
-  } catch(e) {
-    toast('Error cargando datos: ' + e.message, 'err');
-    logMsg('ERROR load: ' + e.message, true);
-  }
-}
-async function reloadAll() {
-  await loadAll();
-  render();
-  toast('Datos recargados ✓', 'ok');
-}
-function render() { renderLlaves(); renderPartidos(); renderUsuarios(); }
+  const [{ data: partidos }, { data: resultados }] = await Promise.all([
+    sb.from('partidos').select('*').order('fecha').order('hora'),
+    sb.from('resultados').select('*')
+  ]);
 
-// ── TAB SWITCH ────────────────────────────────────────────────────
-function switchTab(name, btn) {
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
-  document.getElementById('view-'+name).classList.add('on');
-  btn.classList.add('on');
+  MATCHES = partidos || [];
+  RESULTADOS = {};
+  (resultados || []).forEach(r => {
+    RESULTADOS[r.partido_id] = { gl: r.goles_local, gv: r.goles_vis, gol: r.goleadores || '', tar: r.tarjetas || '' };
+  });
+
+  const etapas = [...new Set(MATCHES.map(m => m.etapa))];
+  $('resStage').innerHTML = '<option value="">TODAS LAS FASES</option>' +
+    etapas.map(e => `<option value="${e}">${e.toUpperCase()}</option>`).join('');
+  $('resStage').onchange = renderRes;
+
+  renderRes();
+  loadLeaderboard();
+
+  // Realtime: actualizar cuando llega un resultado nuevo
+  sb.channel('admin-resultados')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, payload => {
+      if (payload.new) {
+        RESULTADOS[payload.new.partido_id] = {
+          gl: payload.new.goles_local, gv: payload.new.goles_vis,
+          gol: payload.new.goleadores || '', tar: payload.new.tarjetas || ''
+        };
+        // Solo actualizar la tarjeta afectada, no todo el grid
+        refreshCard(payload.new.partido_id);
+        loadLeaderboard();
+      }
+      if (payload.eventType === 'DELETE') {
+        delete RESULTADOS[payload.old.partido_id];
+        refreshCard(payload.old.partido_id);
+        loadLeaderboard();
+      }
+    })
+    .subscribe();
+
+  // Actualizar badges de estado cada 60s (sin re-renderizar inputs)
+  setInterval(updateAllBadges, 60_000);
+  // Fallback: recargar tabla cada 2 minutos
+  setInterval(loadLeaderboard, 2 * 60_000);
 }
 
-// ── LLAVES ────────────────────────────────────────────────────────
-function renderLlaves() {
-  document.getElementById('phases-wrap').innerHTML = FASES.map(f => {
-    const s = D.fases[f.id];
-    const conf = !!s?.confirmado;
-    const teams = s?.equipos || [];
-    return `
-    <div class="ph ${conf?'conf':''}" id="ph-${f.id}">
-      <div class="ph-hd">
-        <span class="ph-icon">${f.icon}</span>
-        <div style="flex:1">
-          <div class="ph-name">${f.label}</div>
-          <div class="ph-meta">${f.n} equipos · ${f.pts} pts/acierto · máx ${f.n*f.pts} pts</div>
+// Actualizar solo los badges de estado sin tocar los inputs
+function updateAllBadges() {
+  MATCHES.forEach(m => {
+    const badgeEl = document.getElementById('badge-' + m.id);
+    if (badgeEl) badgeEl.outerHTML = `<span id="badge-${m.id}">${statusBadge(m)}</span>`;
+  });
+}
+
+// Actualizar una sola tarjeta sin afectar otras
+function refreshCard(mid) {
+  const m = MATCHES.find(x => x.id === mid);
+  if (!m) return;
+  const card = document.getElementById('res-' + mid);
+  if (!card) return;
+  const r = RESULTADOS[mid] || { gl: '', gv: '', gol: '', tar: '' };
+  const saved = r.gl != null && r.gl !== '';
+  card.className = `bet-card ${saved ? 'saved' : ''} ${matchStatus(m) === 'live' ? 'live' : ''}`;
+  // Actualizar inputs de score si no están siendo editados
+  const glInput = card.querySelector('[data-s="gl"]');
+  const gvInput = card.querySelector('[data-s="gv"]');
+  if (glInput && document.activeElement !== glInput) glInput.value = r.gl != null && r.gl !== '' ? r.gl : '';
+  if (gvInput && document.activeElement !== gvInput) gvInput.value = r.gv != null && r.gv !== '' ? r.gv : '';
+}
+
+// ── RENDER ─────────────────────────────────────────
+function renderRes() {
+  const st = $('resStage').value;
+  const list = MATCHES.filter(m => !st || m.etapa === st);
+
+  $('resGrid').innerHTML = list.map(m => {
+    const r = RESULTADOS[m.id] || { gl: '', gv: '', gol: '', tar: '' };
+    const saved = r.gl != null && r.gl !== '';
+    const status = matchStatus(m);
+    const isLive = status === 'live';
+    return `<div class="bet-card ${saved ? 'saved' : ''} ${isLive ? 'live' : ''}" id="res-${m.id}">
+      <div class="bet-top">
+        <span class="stage">${m.etapa}</span>
+        <span>P${m.id} · ${fmtWhen(m)}</span>
+        <span id="badge-${m.id}">${statusBadge(m)}</span>
+        ${saved ? `<button class="btn danger" style="font-size:9px;padding:2px 8px" onclick="borrar(${m.id})">🗑 Borrar</button>` : ''}
+      </div>
+      <div class="bet-teams">
+        <div class="bt">${flag(m.codigo_local, m.local)}<span>${m.local}</span></div>
+        <input class="score-in" type="number" min="0" max="20"
+          value="${r.gl != null && r.gl !== '' ? r.gl : ''}" data-m="${m.id}" data-s="gl">
+        <span class="score-sep">–</span>
+        <input class="score-in" type="number" min="0" max="20"
+          value="${r.gv != null && r.gv !== '' ? r.gv : ''}" data-m="${m.id}" data-s="gv">
+        <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis, m.visitante)}</div>
+      </div>
+      <div class="gol-builder">
+        <div class="section-sep">⚽ Goles</div>
+        <div class="gol-rows" id="gol-rows-${m.id}">
+          ${parseGols(r.gol||'').map(g=>golRowHtml(m.id,g)).join('')}
         </div>
-        <span>${conf?'<span class="ok-badge">✓ CONFIRMADO</span>':'<span class="no-badge">PENDIENTE</span>'}</span>
-      </div>
-      <div class="tags">
-        ${teams.length ? teams.map(t=>`<span class="tag">${esc(t)}</span>`).join('') : '<span style="color:var(--grey);font-size:12px">Sin equipos aún</span>'}
-      </div>
-      <div class="ph-acts">
-        <button class="btn b-pri b-sm" onclick="toggleEdit('${f.id}')">✏️ Editar</button>
-        ${conf
-          ? `<button class="btn b-warn b-sm" onclick="setConf('${f.id}',false)">↩ Desconfirmar</button>`
-          : `<button class="btn b-ok b-sm" onclick="setConf('${f.id}',true)"${!teams.length?' disabled':''}>✓ Confirmar</button>`}
-        <span id="ph-st-${f.id}" style="font-size:11px;color:var(--grey);align-self:center"></span>
-      </div>
-      <div class="ea" id="ea-${f.id}">
-        <div class="ea-hint">Un equipo por línea (${f.n} esperados). Nombre exacto con tildes:</div>
-        <textarea id="ta-${f.id}" oninput="cntTeams('${f.id}')">${teams.join('\n')}</textarea>
-        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
-          <button class="btn b-ok b-sm" onclick="savePhase('${f.id}')">💾 Guardar</button>
-          <button class="btn b-ghost b-sm" onclick="toggleEdit('${f.id}')">Cancelar</button>
-          <span id="cnt-${f.id}" style="font-size:11px;color:var(--grey)"></span>
+        <button class="btn-add-gol" onclick="addGolRow(${m.id})">+ Agregar gol</button>
+        <div class="section-sep"><span class="tc tc-y"></span><span class="tc tc-r"></span> Tarjetas</div>
+        <div class="card-builder">
+          <div class="card-rows" id="card-rows-${m.id}">
+            ${parseTarjetas(r.tar||'').map(t=>cardRowHtml(m.id,t)).join('')}
+          </div>
+          <button class="btn-add-gol" onclick="addCardRow(${m.id})">+ Agregar tarjeta</button>
         </div>
       </div>
     </div>`;
-  }).join('');
-  FASES.forEach(f => cntTeams(f.id));
+  }).join('') || '<div class="loading">Sin partidos en esta fase.</div>';
 }
 
-function toggleEdit(fId) { document.getElementById('ea-'+fId).classList.toggle('open'); }
+// ── SAVE (auto) ────────────────────────────────────
+const timers = {};
+function onResInput(e) {
+  const inp = e.target; if (!inp.dataset.m) return;
+  const mid = +inp.dataset.m;
+  if (inp.dataset.s === 'gol-part')  { triggerGolSave(mid);  return; }
+  if (inp.dataset.s === 'card-part') { triggerCardSave(mid); return; }
+  RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null, gol: '', tar: '' };
+  RESULTADOS[mid][inp.dataset.s] = inp.value !== '' ? +inp.value : null;
+  const card = document.getElementById('res-' + mid);
+  if (card) card.classList.add('saving');
+  clearTimeout(timers[mid]);
+  timers[mid] = setTimeout(() => saveResultado(mid), 800);
+}
+$('resGrid').addEventListener('input',  onResInput);
+$('resGrid').addEventListener('change', onResInput);
 
-function cntTeams(fId) {
-  const ta = document.getElementById('ta-'+fId);
-  if (!ta) return;
-  const n = ta.value.split('\n').filter(l=>l.trim()).length;
-  const f = FASES.find(x=>x.id===fId);
-  const el = document.getElementById('cnt-'+fId);
-  if (el) el.textContent = n + ' / ' + f.n + ' equipos';
+async function saveResultado(mid) {
+  const r = RESULTADOS[mid];
+  if (r.gl == null || r.gv == null) return;
+  await sb.from('resultados').upsert({
+    partido_id: mid,
+    goles_local: r.gl,
+    goles_vis: r.gv,
+    goleadores: r.gol || '',
+    tarjetas:   r.tar || '',
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'partido_id' });
+  const card = document.getElementById('res-' + mid);
+  if (card) { card.classList.remove('saving'); card.classList.add('saved'); }
 }
 
-async function savePhase(fId) {
-  const ta = document.getElementById('ta-'+fId);
-  const teams = ta.value.split('\n').map(t=>t.trim()).filter(Boolean);
-  const confirmado = D.fases[fId]?.confirmado || false;
-  const st = document.getElementById('ph-st-'+fId);
-  if (st) st.textContent = 'Guardando...';
+window.borrar = async (mid) => {
+  if (!confirm(`¿Borrar resultado del partido ${mid}?`)) return;
+  await sb.from('resultados').delete().eq('partido_id', mid);
+  delete RESULTADOS[mid];
+  renderRes();
+};
+
+// ── BARRIDO DE GOLEADORES VACÍOS ───────────────────
+window.resyncAll = async () => {
+  const btn = $('btnResync');
+  const status = $('syncStatus');
+  btn.textContent = '⏳ Barriendo…'; btn.disabled = true;
+  status.textContent = 'Consultando SofaScore para goleadores vacíos…';
   try {
-    await sbUpsert('/resultados_fase', { fase:fId, equipos:teams, confirmado });
-    D.fases[fId] = { fase:fId, equipos:teams, confirmado };
-    renderLlaves();
-    renderUsuarios();
-    toast(fId + ': ' + teams.length + ' equipos guardados ✓', 'ok');
-    logMsg('✓ Llaves guardadas: ' + fId + ' (' + teams.length + ' equipos)');
-  } catch(e) {
-    if (st) st.textContent = 'Error';
-    toast('Error: ' + e.message, 'err');
-    logMsg('ERROR savePhase ' + fId + ': ' + e.message, true);
+    const res = await fetch('/api/resync-all');
+    const { ok, fixed = 0, skipped = 0, total = 0, msg, error } = await res.json();
+    if (!ok) throw new Error(error || 'Error desconocido');
+    const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    status.textContent = msg || `✓ Rellenados ${fixed}/${total} partidos (${skipped} no encontrados) · ${now}`;
+    btn.textContent = `✓ ${fixed} rellenos`;
+    if (fixed > 0) { renderRes(); loadLeaderboard(); }
+  } catch (e) {
+    status.textContent = `✗ ${e.message}`;
+    btn.textContent = '✗ Error';
   }
-}
+  setTimeout(() => { btn.textContent = '📋 Rellenar goleadores vacíos'; btn.disabled = false; }, 5000);
+};
 
-async function setConf(fId, value) {
-  if (!D.fases[fId]) { toast('Guarda los equipos primero', 'err'); return; }
-  logMsg((value?'Confirmando':'Desconfirmando') + ' fase ' + fId + '...');
+// ── ESPN SYNC ──────────────────────────────────────
+window.syncESPN = async () => {
+  const btn = $('btnSyncESPN');
+  const status = $('syncStatus');
+  btn.textContent = '⏳ Sincronizando…'; btn.disabled = true;
   try {
-    await sbPatch('/resultados_fase?fase=eq.'+fId, { confirmado:value });
-    D.fases[fId].confirmado = value;
-    renderLlaves();
-    renderUsuarios();
-    toast(fId + (value?' CONFIRMADO ✓':' desconfirmado'), 'ok');
-    logMsg('✓ ' + fId + ' → confirmado=' + value);
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-    logMsg('ERROR setConf: ' + e.message, true);
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const res = await fetch(`/api/sync-espn?date=${today}`);
+    const { updated = 0, error = null } = await res.json();
+    if (error) throw new Error(error);
+    const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    status.textContent = `✓ ${updated} actualizado${updated !== 1 ? 's' : ''} · ${now}`;
+    btn.textContent = `✓ ${updated} actualizados`;
+    setTimeout(() => { btn.textContent = '🔄 Sincronizar ESPN'; btn.disabled = false; }, 3000);
+    if (updated > 0) { renderRes(); loadLeaderboard(); }
+  } catch (e) {
+    status.textContent = `✗ Error: ${e.message}`;
+    btn.textContent = '✗ Error'; btn.disabled = false;
+    setTimeout(() => { btn.textContent = '🔄 Sincronizar ESPN'; }, 3000);
   }
-}
+};
 
-// ── PARTIDOS ──────────────────────────────────────────────────────
-function setRound(rnd, btn) {
-  rndFilter = rnd;
-  document.querySelectorAll('#rfilters button').forEach(b=>{ b.className='btn b-ghost b-sm'; });
-  btn.className = 'btn b-pri b-sm';
-  renderPartidos();
-}
+// ── TABLERO EN VIVO ────────────────────────────────
+const fmtPesos = p => '$' + new Intl.NumberFormat('es-CO').format(p || 0);
 
-function renderPartidos() {
-  const list = rndFilter
-    ? D.partidos.filter(p=>p.etapa===rndFilter||(rndFilter==='Final'&&p.etapa==='Tercer puesto'))
-    : D.partidos;
-  const wrap = document.getElementById('partidos-wrap');
-  if (!list.length) { wrap.innerHTML = '<div class="card">Sin partidos.</div>'; return; }
+async function loadLeaderboard() {
+  const { data, error } = await sb.from('v_tabla').select('*');
+  const now = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  $('lastUpd').textContent = `Última actualización: ${now}`;
 
-  wrap.innerHTML = `<div class="card tbl-wrap"><table>
-    <thead><tr>
-      <th>#</th><th>Ronda</th><th>Fecha · Hora</th>
-      <th>Local</th><th style="text-align:center">GL</th>
-      <th style="text-align:center">GV</th><th>Visitante</th>
-      <th>Resultado actual</th><th>Acción</th>
-    </tr></thead>
-    <tbody>
-    ${list.map(p => {
-      const r = D.resultados[p.id] || {};
-      const hr = r.goles_local != null;
-      return `<tr id="tr-${p.id}">
-        <td style="color:var(--grey);font-size:11px">${p.id}</td>
-        <td><span style="font-size:11px;background:var(--paper);padding:2px 6px;border-radius:4px;white-space:nowrap">${p.etapa}</span></td>
-        <td style="font-size:11px;white-space:nowrap">${p.fecha}<br><span style="color:var(--grey)">${(p.hora||'').slice(0,5)}</span></td>
-        <td><input class="inp" id="loc-${p.id}" value="${esc(p.local||'')}" placeholder="Local" style="min-width:120px"></td>
-        <td><input class="inp inp-sc" id="gl-${p.id}" type="number" min="0" max="30" value="${hr?r.goles_local:''}" placeholder="−"></td>
-        <td><input class="inp inp-sc" id="gv-${p.id}" type="number" min="0" max="30" value="${hr?r.goles_vis:''}" placeholder="−"></td>
-        <td><input class="inp" id="vis-${p.id}" value="${esc(p.visitante||'')}" placeholder="Visitante" style="min-width:120px"></td>
-        <td>
-          <span class="dot ${hr?'dg':'dgr'}"></span>
-          ${hr ? `<b>${r.goles_local} – ${r.goles_vis}</b>` : '<span style="color:var(--grey)">Sin resultado</span>'}
-        </td>
-        <td><button class="btn b-pri b-sm" onclick="savePartido(${p.id})">Guardar</button></td>
-      </tr>`;
-    }).join('')}
-    </tbody>
-  </table></div>`;
-}
-
-async function savePartido(id) {
-  const local = (document.getElementById('loc-'+id).value||'').trim();
-  const vis   = (document.getElementById('vis-'+id).value||'').trim();
-  const glRaw = (document.getElementById('gl-'+id).value||'').trim();
-  const gvRaw = (document.getElementById('gv-'+id).value||'').trim();
-  const hasScore = glRaw !== '' && gvRaw !== '';
-  logMsg('Guardando partido ' + id + ': ' + local + ' vs ' + vis + (hasScore?' ['+glRaw+'-'+gvRaw+']':''));
-  try {
-    await sbPatch('/partidos?id=eq.'+id, { local, visitante:vis });
-    if (hasScore) {
-      const gl = parseInt(glRaw,10), gv = parseInt(gvRaw,10);
-      if (isNaN(gl)||isNaN(gv)) throw new Error('Marcador inválido');
-      await sbUpsert('/resultados?on_conflict=partido_id', { partido_id:id, goles_local:gl, goles_vis:gv });
-      D.resultados[id] = { ...(D.resultados[id]||{}), partido_id:id, goles_local:gl, goles_vis:gv };
-    }
-    const idx = D.partidos.findIndex(p=>p.id===id);
-    if (idx!==-1) { D.partidos[idx].local=local; D.partidos[idx].visitante=vis; }
-    toast('Partido ' + id + ' guardado ✓', 'ok');
-    logMsg('✓ Partido ' + id + ' guardado');
-    renderPartidos();
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-    logMsg('ERROR partido ' + id + ': ' + e.message, true);
-  }
-}
-
-// ── USUARIOS ──────────────────────────────────────────────────────
-function calcLlaves(uid) {
-  let total = 0;
-  const prons = D.pronFases[uid] || {};
-  for (const [fase, teams] of Object.entries(prons)) {
-    const s = D.fases[fase];
-    if (!s?.confirmado || !s.equipos?.length) continue;
-    const set = new Set(s.equipos);
-    total += (teams||[]).filter(t=>set.has(t)).length * (FASE_PTS[fase]||0);
-  }
-  return total;
-}
-
-function renderUsuarios() {
-  const rows = D.vtabla.map(u => {
-    const l = calcLlaves(u.id);
-    return { ...u, pts_llaves:l, pts_total:(u.puntos||0)+l };
-  }).sort((a,b)=>b.pts_total-a.pts_total||(b.exactos-a.exactos));
-
-  document.getElementById('usuarios-wrap').innerHTML = `
-  <div class="card tbl-wrap"><table>
-    <thead><tr>
-      <th>#</th><th>Participante</th>
-      <th class="tn">Eval.</th><th class="tn">Exactos</th><th class="tn">Aciertos</th>
-      <th class="tn">Pts Partido</th>
-      <th class="tn" style="color:#4ade80">Pts Llaves</th>
-      <th class="tn" style="color:var(--am)">TOTAL</th>
-      <th class="tn">💰 Pesos</th>
-      <th>Acciones</th>
-    </tr></thead>
-    <tbody>
-    ${rows.map((u,i)=>`
-      <tr class="${['r1','r2','r3'][i]||''}">
-        <td style="font-weight:800;color:var(--grey)">${i+1}</td>
-        <td><b>${esc(u.nombre_completo)}</b></td>
-        <td class="tn" style="color:var(--grey)">${u.evaluados||0}</td>
-        <td class="tn">${u.exactos||0}</td>
-        <td class="tn">${u.aciertos||0}</td>
-        <td class="tn">${u.puntos||0}</td>
-        <td class="tn" style="color:var(--green);font-weight:700">${u.pts_llaves}</td>
-        <td class="tn" style="font-size:18px;font-weight:800;color:var(--nodo)">${u.pts_total}</td>
-        <td class="tn" style="font-size:12px;color:var(--grey)">$${(u.pesos||0).toLocaleString('es-CO')}</td>
-        <td>
-          <button class="btn b-ghost b-sm" onclick="toggleDetail('${u.id}')">👁 Ver</button>
-          <button class="btn b-del b-sm" style="margin-left:4px" onclick="confirmDel('${u.id}','${esc(u.nombre_completo)}')">🗑</button>
-        </td>
-      </tr>
-      <tr class="detail-row" id="det-${u.id}" style="display:none">
-        <td colspan="10"><div class="detail-body" id="detb-${u.id}"></div></td>
-      </tr>`).join('')}
-    </tbody>
-  </table></div>`;
-}
-
-function toggleDetail(uid) {
-  const row = document.getElementById('det-'+uid);
-  if (row.style.display !== 'none') { row.style.display='none'; return; }
-
-  const u = D.vtabla.find(x=>x.id===uid);
-  const prons = D.pronFases[uid] || {};
-  let html = '<strong>' + esc(u?.nombre_completo||uid) + '</strong> — Pronósticos de llaves:<br><br>';
-  const hasProns = FASES.some(f=>(prons[f.id]||[]).length>0);
-
-  if (!hasProns) {
-    html += '<span style="color:var(--grey);font-size:12px">No ha llenado pronósticos de llaves.</span>';
-  } else {
-    html += '<div style="display:flex;flex-wrap:wrap;gap:14px">';
-    for (const f of FASES) {
-      const teams = prons[f.id] || [];
-      if (!teams.length) continue;
-      const s = D.fases[f.id];
-      const set = s?.confirmado ? new Set(s.equipos||[]) : null;
-      const hits = set ? teams.filter(t=>set.has(t)).length : null;
-      const pts  = hits !== null ? hits * f.pts : null;
-      html += '<div style="min-width:140px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:var(--grey);margin-bottom:6px">'
-        + f.icon + ' ' + f.label
-        + (pts!==null ? ' <span style="color:var(--green)">+' + pts + 'pts</span>' : '')
-        + '</div><div style="display:flex;flex-wrap:wrap;gap:4px">'
-        + teams.map(t => {
-            const ok = set ? set.has(t) : null;
-            const st = ok===null?'background:#e5e7eb;color:#374151':ok?'background:#dcfce7;color:#15803d':'background:#fee2e2;color:#dc2626';
-            return '<span style="font-size:11px;padding:2px 7px;border-radius:3px;' + st + '">' + esc(t) + '</span>';
-          }).join('')
-        + '</div></div>';
-    }
-    html += '</div>';
+  if (error || !data || !data.length) {
+    $('podioGrid').innerHTML = '<div style="color:rgba(255,255,255,.4);font-size:12px;font-family:monospace;grid-column:1/-1">Sin datos.</div>';
+    return;
   }
 
-  const ex = u?.exactos||0, ac = u?.aciertos||0, pts = u?.puntos||0;
-  const expectedPts = ex*3 + ac;
-  html += '<div style="margin-top:12px;font-size:12px;color:var(--grey);border-top:1px dashed #e5e7eb;padding-top:10px">'
-    + '<b>Verificación pts partidos:</b> ' + ex + '×3 + ' + ac + '×1 = <b>' + pts + '</b> pts '
-    + (expectedPts===pts ? '<span style="color:var(--green)">✅ Correcto</span>' : '<span style="color:var(--red)">⚠️ Discrepancia: esperado ' + expectedPts + '</span>')
-    + '</div>';
+  const medals = ['🥇', '🥈', '🥉'];
+  const posClass = ['pos-1', 'pos-2', 'pos-3'];
 
-  document.getElementById('detb-'+uid).innerHTML = html;
-  row.style.display = '';
-}
-
-// ── DELETE ────────────────────────────────────────────────────────
-function confirmDel(uid, name) {
-  document.getElementById('modal-body').innerHTML =
-    '¿Seguro que quieres eliminar a <strong>' + esc(name) + '</strong>?<br><br>'
-    + 'Se borrarán <strong>permanentemente</strong>:<br>'
-    + '&nbsp;• Pronósticos de partidos<br>'
-    + '&nbsp;• Pronósticos de llaves<br>'
-    + '&nbsp;• Cuenta de usuario<br><br>'
-    + '<strong style="color:var(--red)">Esta acción no se puede deshacer.</strong>';
-  document.getElementById('modal-ok').onclick = () => doDelete(uid, name);
-  document.getElementById('modal').classList.add('open');
-}
-function closeModal() { document.getElementById('modal').classList.remove('open'); }
-async function doDelete(uid, name) {
-  closeModal();
-  logMsg('Eliminando: ' + name + '...');
-  try {
-    await sbDelete('/usuarios?id=eq.'+uid);
-    D.vtabla = D.vtabla.filter(u=>u.id!==uid);
-    delete D.pronFases[uid];
-    renderUsuarios();
-    toast(name + ' eliminado ✓', 'ok');
-    logMsg('✓ Usuario eliminado: ' + name);
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-    logMsg('ERROR delete: ' + e.message, true);
-  }
-}
-
-// ── ACCIONES ──────────────────────────────────────────────────────
-async function recalcBracket() {
-  logMsg('Llamando /api/bracket...');
-  try {
-    const r = await fetch('/api/bracket');
-    const j = await r.json();
-    logMsg('✓ Bracket recalculado. Partidos: ' + (j.partidos||[]).length);
-    toast('Bracket recalculado ✓', 'ok');
-    const newP = await sbGet('/partidos?id=gte.73&select=*&order=id');
-    D.partidos = newP || [];
-    renderPartidos();
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-    logMsg('ERROR bracket: ' + e.message, true);
-  }
-}
-
-async function syncEspn() {
-  logMsg('Llamando /api/sync-espn...');
-  try {
-    const r = await fetch('/api/sync-espn');
-    const j = await r.json();
-    toast('Sincronizado: ' + (j.updated||0) + ' resultados ✓', 'ok');
-    logMsg('✓ ESPN sync: ' + (j.updated||0) + ' actualizados');
-    await reloadAll();
-  } catch(e) {
-    toast('Error: ' + e.message, 'err');
-    logMsg('ERROR sync: ' + e.message, true);
-  }
-}
-
-function runDiag() {
-  logMsg('Ejecutando diagnóstico...');
-  const confFases = FASES.filter(f=>D.fases[f.id]?.confirmado);
-  const rows = D.vtabla.map(u => {
-    const prons = D.pronFases[u.id] || {};
-    const byFase = {};
-    let pts_llaves = 0;
-    for (const f of FASES) {
-      const teams = prons[f.id] || [];
-      const s = D.fases[f.id];
-      if (s?.confirmado && teams.length) {
-        const set = new Set(s.equipos||[]);
-        const hits = teams.filter(t=>set.has(t)).length;
-        const pts  = hits * f.pts;
-        byFase[f.id] = { hits, pts };
-        pts_llaves += pts;
-      }
-    }
-    const pts_total = (u.puntos||0) + pts_llaves;
-    const check = (u.exactos||0)*3 + (u.aciertos||0);
-    return { ...u, pts_llaves, pts_total, byFase, check, ok: check===(u.puntos||0) };
-  }).sort((a,b)=>b.pts_total-a.pts_total);
-
-  document.getElementById('diag-out').innerHTML = `
-  <div class="card" style="margin-top:16px">
-    <div class="ct" style="margin-bottom:12px">📊 Diagnóstico completo — ${new Date().toLocaleString('es-CO')}</div>
-    <div class="tbl-wrap"><table>
-      <thead><tr>
-        <th>#</th><th>Participante</th>
-        <th class="tn">Eval.</th><th class="tn">Exactos</th><th class="tn">Aciertos</th>
-        <th class="tn">Pts Partido</th>
-        ${confFases.map(f=>'<th class="tn" style="font-size:10px">'+f.icon+f.id.slice(0,4)+'</th>').join('')}
-        <th class="tn" style="color:#4ade80">Pts Llaves</th>
-        <th class="tn" style="color:var(--am)">TOTAL</th>
-        <th>Verificación matemática</th>
-      </tr></thead>
-      <tbody>
-      ${rows.map((u,i)=>`<tr>
-        <td>${i+1}</td><td><b>${esc(u.nombre_completo)}</b></td>
-        <td class="tn" style="color:var(--grey)">${u.evaluados||0}</td>
-        <td class="tn">${u.exactos||0}</td>
-        <td class="tn">${u.aciertos||0}</td>
-        <td class="tn">${u.puntos||0}</td>
-        ${confFases.map(f=>`<td class="tn" style="color:var(--green);font-size:11px">${u.byFase[f.id]?.pts||0}</td>`).join('')}
-        <td class="tn" style="color:var(--green);font-weight:700">${u.pts_llaves}</td>
-        <td class="tn" style="font-size:16px;font-weight:800">${u.pts_total}</td>
-        <td style="font-size:11px;white-space:nowrap">
-          ${u.ok
-            ? '<span style="color:var(--green)">✅ '+u.exactos+'×3+'+u.aciertos+'='+u.puntos+'</span>'
-            : '<span style="color:var(--red)">⚠️ esperado '+u.check+' vs '+u.puntos+'</span>'}
-        </td>
-      </tr>`).join('')}
-      </tbody>
-    </table></div>
-    <div style="margin-top:12px;font-size:12px;color:var(--grey)">
-      Fases confirmadas: <b>${confFases.length ? confFases.map(f=>f.id).join(', ') : 'ninguna'}</b>
+  $('podioGrid').innerHTML = data.slice(0, 3).map((r, i) => `
+    <div class="podio-card ${posClass[i]}">
+      <div class="podio-medal">${medals[i]}</div>
+      <div class="podio-name" title="${r.nombre_completo}">${r.nombre_completo}</div>
+      <div class="podio-pts">${r.puntos} <span style="font-size:14px">PTS</span></div>
+      <div class="podio-pesos">💰 ${fmtPesos(r.pesos)}</div>
+      <div class="podio-sub">${r.exactos} exactos · ${r.aciertos} aciertos<br>${r.evaluados} partidos evaluados</div>
     </div>
-  </div>`;
-  logMsg('✓ Diagnóstico completado');
+  `).join('');
+
+  $('liveTable').innerHTML =
+    `<tr><th>#</th><th>Participante</th><th class="r">Pts</th><th class="r">Exactos</th><th class="r">Aciertos</th><th class="r">Eval.</th><th class="r">💰 Pesos acum.</th></tr>` +
+    data.map((r, i) => `<tr class="${i < 3 ? posClass[i] : ''}">
+      <td><b>${medals[i] || (i + 1)}</b></td>
+      <td><b>${r.nombre_completo}</b></td>
+      <td class="r"><b>${r.puntos}</b></td>
+      <td class="r">${r.exactos}</td>
+      <td class="r">${r.aciertos}</td>
+      <td class="r dim">${r.evaluados}</td>
+      <td class="r ${i < 3 ? 'money-col' : 'dim'}">${fmtPesos(r.pesos)}</td>
+    </tr>`).join('');
 }
 
-// ── UTILS ─────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+// Realtime tablero
+sb.channel('admin-tablero-live')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, () => {
+    loadLeaderboard();
+  })
+  .subscribe();
+
+// ══════════════════════════════════════════════════
+// ADMIN BRACKET — GESTIÓN DE LLAVES
+// ══════════════════════════════════════════════════
+const BRACKET_EQUIPOS = {
+  A:[{n:'México',c:'mx'},{n:'Sudáfrica',c:'za'},{n:'Corea del Sur',c:'kr'},{n:'República Checa',c:'cz'}],
+  B:[{n:'Canadá',c:'ca'},{n:'Bosnia y Herzegovina',c:'ba'},{n:'Catar',c:'qa'},{n:'Suiza',c:'ch'}],
+  C:[{n:'Haití',c:'ht'},{n:'Escocia',c:'gb-sct'},{n:'Brasil',c:'br'},{n:'Marruecos',c:'ma'}],
+  D:[{n:'Estados Unidos',c:'us'},{n:'Paraguay',c:'py'},{n:'Australia',c:'au'},{n:'Turquía',c:'tr'}],
+  E:[{n:'Costa de Marfil',c:'ci'},{n:'Ecuador',c:'ec'},{n:'Alemania',c:'de'},{n:'Curazao',c:'cw'}],
+  F:[{n:'Países Bajos',c:'nl'},{n:'Japón',c:'jp'},{n:'Suecia',c:'se'},{n:'Túnez',c:'tn'}],
+  G:[{n:'Irán',c:'ir'},{n:'Nueva Zelanda',c:'nz'},{n:'Bélgica',c:'be'},{n:'Egipto',c:'eg'}],
+  H:[{n:'Arabia Saudita',c:'sa'},{n:'Uruguay',c:'uy'},{n:'España',c:'es'},{n:'Cabo Verde',c:'cv'}],
+  I:[{n:'Francia',c:'fr'},{n:'Senegal',c:'sn'},{n:'Irak',c:'iq'},{n:'Noruega',c:'no'}],
+  J:[{n:'Argentina',c:'ar'},{n:'Argelia',c:'dz'},{n:'Austria',c:'at'},{n:'Jordania',c:'jo'}],
+  K:[{n:'Portugal',c:'pt'},{n:'RD Congo',c:'cd'},{n:'Uzbekistán',c:'uz'},{n:'Colombia',c:'co'}],
+  L:[{n:'Ghana',c:'gh'},{n:'Panamá',c:'pa'},{n:'Inglaterra',c:'gb-eng'},{n:'Croacia',c:'hr'}],
+};
+const BRACKET_FASES = [
+  {id:'dieciseisavos',label:'Dieciseisavos de final',count:32,pts:2},
+  {id:'octavos',      label:'Octavos de final',      count:16,pts:3},
+  {id:'cuartos',      label:'Cuartos de final',       count:8, pts:5},
+  {id:'semis',        label:'Semifinales',            count:4, pts:8},
+  {id:'finalistas',   label:'Finalistas',             count:2, pts:12},
+  {id:'campeon',      label:'Campeón',                count:1, pts:20},
+];
+
+let ADMIN_BRACKET = {};
+
+async function loadBracketAdmin() {
+  const { data } = await sb.from('resultados_fase').select('*');
+  ADMIN_BRACKET = {};
+  (data || []).forEach(r => { ADMIN_BRACKET[r.fase] = { equipos: new Set(r.equipos || []), confirmado: r.confirmado }; });
+  renderBracketAdmin();
 }
-let _ll = [];
-function logMsg(msg, err=false) {
-  const ts = new Date().toLocaleTimeString('es-CO',{hour12:false});
-  _ll.push({ts, msg, err});
-  if (_ll.length>80) _ll.shift();
-  const el = document.getElementById('log');
-  if (!el) return;
-  el.innerHTML = _ll.map(l=>'<div class="'+(l.err?'le':l.msg[0]==='✓'?'':'li')+'">['+l.ts+'] '+esc(l.msg)+'</div>').join('');
-  el.scrollTop = el.scrollHeight;
+
+function renderBracketAdmin() {
+  const con = document.getElementById('bracketAdmin');
+  if (!con) return;
+
+  con.innerHTML = BRACKET_FASES.map(f => {
+    const state  = ADMIN_BRACKET[f.id] || { equipos: new Set(), confirmado: false };
+    const sel    = state.equipos;
+    const conf   = state.confirmado;
+    const count  = sel.size;
+    const full   = count >= f.count;
+
+    const teamsHtml = Object.entries(BRACKET_EQUIPOS).map(([grupo, teams]) => {
+      const rows = teams.map(t => {
+        const isSel = sel.has(t.n);
+        const disableCheck = conf || (!isSel && full);
+        return `<label style="display:flex;align-items:center;gap:6px;padding:4px 6px;cursor:${conf?'default':'pointer'};border:1.5px solid ${isSel?'var(--nodo)':'transparent'};margin-bottom:2px;border-radius:2px;background:${isSel?'rgba(0,17,102,.06)':'transparent'};font-size:11px;font-family:'Spline Sans Mono',monospace" data-fase="${f.id}" data-equipo="${t.n}">
+          <input type="checkbox" ${isSel?'checked':''} ${disableCheck?'disabled':''} style="width:14px;height:14px;accent-color:var(--nodo);cursor:${conf?'default':'pointer'}">
+          ${flag(t.c,t.n)}
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.n}</span>
+        </label>`;
+      }).join('');
+      return `<div><div style="font-family:'Spline Sans Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--nodo);font-weight:700;margin-bottom:3px;border-bottom:1px solid rgba(0,17,102,.12);padding-bottom:2px">Grupo ${grupo}</div>${rows}</div>`;
+    }).join('');
+
+    return `<div style="background:var(--card);border:2px solid var(--nodo);box-shadow:3px 3px 0 var(--nodo);margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--nodo);color:var(--blanco);flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-family:'Archivo Black',sans-serif;font-size:14px;color:var(--amarillo)">${f.label}</div>
+          <div style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:rgba(255,255,255,.6)">Selecciona ${f.count} equipo${f.count>1?'s':''} · ${f.pts} pts cada acierto para usuarios</div>
+        </div>
+        ${conf ? `<span style="background:#16a34a;color:#fff;font-family:'Spline Sans Mono',monospace;font-size:10px;padding:3px 10px;font-weight:700">✓ CONFIRMADO</span>` : `<span style="background:var(--amarillo);color:var(--nodo);font-family:'Spline Sans Mono',monospace;font-size:10px;padding:3px 10px;font-weight:700">PENDIENTE</span>`}
+      </div>
+      <div style="padding:8px 14px;font-family:'Spline Sans Mono',monospace;font-size:11px;border-bottom:1px solid rgba(0,17,102,.1);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="admin-bc-cnt-${f.id}" style="color:${full?'var(--rojo)':'var(--grey)'};font-weight:${full?700:400}">${count}/${f.count} seleccionados</span>
+        ${!conf ? `
+          <button class="btn primary" style="font-size:10px;padding:4px 12px" onclick="saveFaseAdmin('${f.id}',false)">💾 Guardar borrador</button>
+          <button class="btn danger" style="font-size:10px;padding:4px 12px" onclick="saveFaseAdmin('${f.id}',true)" ${count<f.count?'disabled title="Selecciona los '+f.count+' equipos primero"':''}>✓ Confirmar y dar puntos</button>
+        ` : `
+          <button class="btn" style="font-size:10px;padding:4px 12px;border-color:var(--rojo);color:var(--rojo)" onclick="desconfirmarFase('${f.id}')">↩ Desconfirmar (editar)</button>
+        `}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;padding:10px 14px" id="admin-teams-${f.id}">
+        ${teamsHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  con.querySelectorAll('[data-fase][data-equipo] input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const label  = cb.closest('[data-fase]');
+      const faseId = label.dataset.fase;
+      const equipo = label.dataset.equipo;
+      const fase   = BRACKET_FASES.find(f => f.id === faseId);
+      if (!fase) return;
+      if (!ADMIN_BRACKET[faseId]) ADMIN_BRACKET[faseId] = { equipos: new Set(), confirmado: false };
+      if (ADMIN_BRACKET[faseId].confirmado) { cb.checked = !cb.checked; return; }
+      if (cb.checked) {
+        if (ADMIN_BRACKET[faseId].equipos.size >= fase.count) { cb.checked = false; return; }
+        ADMIN_BRACKET[faseId].equipos.add(equipo);
+      } else {
+        ADMIN_BRACKET[faseId].equipos.delete(equipo);
+      }
+      const cnt   = ADMIN_BRACKET[faseId].equipos.size;
+      const full2 = cnt >= fase.count;
+      const cntEl = document.getElementById('admin-bc-cnt-' + faseId);
+      if (cntEl) { cntEl.textContent = `${cnt}/${fase.count} seleccionados`; cntEl.style.color = full2 ? 'var(--rojo)' : 'var(--grey)'; cntEl.style.fontWeight = full2 ? 700 : 400; }
+      document.getElementById('admin-teams-' + faseId)
+        ?.querySelectorAll('input[type=checkbox]')
+        .forEach(box => { if (!box.checked) box.disabled = full2; });
+    });
+  });
 }
-let _tt;
-function toast(msg, type='ok') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show '+type;
-  clearTimeout(_tt); _tt = setTimeout(()=>t.className='', 3200);
-}
-document.addEventListener('keydown', e => {
-  if (e.key==='Escape') closeModal();
-});
+
+window.saveFaseAdmin = async (faseId, confirmar) => {
+  const state   = ADMIN_BRACKET[faseId] || { equipos: new Set(), confirmado: false };
+  const equipos = Array.from(state.equipos);
+  if (confirmar && !confirm(`¿Confirmar los ${equipos.length} equipos clasificados en "${faseId}"? Los usuarios recibirán puntos inmediatamente.`)) return;
+  const { error } = await sb.from('resultados_fase').upsert(
+    { fase: faseId, equipos, confirmado: confirmar, updated_at: new Date().toISOString() },
+    { onConflict: 'fase' }
+  );
+  if (error) { alert('Error: ' + error.message); return; }
+  if (ADMIN_BRACKET[faseId]) ADMIN_BRACKET[faseId].confirmado = confirmar;
+  alert(confirmar ? `✓ ${faseId} confirmado. Los usuarios recibirán sus puntos.` : `✓ Borrador guardado.`);
+  await loadBracketAdmin();
+};
+
+window.desconfirmarFase = async (faseId) => {
+  if (!confirm(`¿Desconfirmar "${faseId}" y permitir edición? Los puntos se recalcularán.`)) return;
+  const state   = ADMIN_BRACKET[faseId] || { equipos: new Set() };
+  const equipos = Array.from(state.equipos);
+  await sb.from('resultados_fase').upsert(
+    { fase: faseId, equipos, confirmado: false, updated_at: new Date().toISOString() },
+    { onConflict: 'fase' }
+  );
+  await loadBracketAdmin();
+};
+
+document.addEventListener('admin-ready', () => loadBracketAdmin());
 </script>
 </body>
 </html>
