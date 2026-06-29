@@ -587,6 +587,8 @@ app.get('/api/sync-espn', async (req, res) => {
     const [espnEvents, sofaEvents] = await Promise.all([fetchESPN(colDateNum()), fetchSofaScore(colDate())]);
     const er = espnEvents.length ? await processESPN(espnEvents) : { updated:0 };
     const sr = sofaEvents.length ? await processSofa(sofaEvents)  : { updated:0 };
+    // También recomputa el bracket tras sync manual
+    scheduleBracketUpdate();
     res.json({ updated: er.updated + sr.updated, espnEvents: espnEvents.length, sofaEvents: sofaEvents.length });
   } catch(e) { res.json({ error: e.message }); }
 });
@@ -718,8 +720,11 @@ app.get('/api/debug-goals', async (req, res) => {
 
 // Marcadores actuales (polling de clientes cada 30s)
 app.get('/api/live', async (req, res) => {
-  const data = await sbRest('/resultados?select=partido_id,goles_local,goles_vis,goleadores,tarjetas,updated_at');
-  res.json({ ok: true, ts: Date.now(), resultados: data || [] });
+  const [resultados, knockoutPartidos] = await Promise.all([
+    sbRest('/resultados?select=partido_id,goles_local,goles_vis,goleadores,tarjetas,updated_at'),
+    sbRest('/partidos?id=gte.73&select=id,local,visitante,codigo_local,codigo_vis&order=id'),
+  ]);
+  res.json({ ok: true, ts: Date.now(), resultados: resultados || [], partidos: knockoutPartidos || [] });
 });
 
 // Bracket: fuerza recomputo y retorna partidos de eliminatorias con equipos resueltos

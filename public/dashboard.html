@@ -259,6 +259,8 @@ async function init() {
   $('stageFilter').innerHTML = '<option value="">TODAS LAS FASES</option>' +
     etapas.map(e => `<option value="${e}">${e.toUpperCase()}</option>`).join('');
   renderAll();
+  // Pre-cargar bracket en segundo plano para tener datos listos antes de abrir el tab
+  loadBracket();
 }
 
 function getFiltered() {
@@ -550,54 +552,78 @@ function renderAll() {
   // bracket se carga por loadBracket() al activar el tab
 }
 
-// Realtime (WebSocket Supabase): resultados + partidos (para cuando avanzan equipos)
-const dashChannel = sb.channel('dash-live')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, payload => {
-    if (payload.new) RESULTADOS[payload.new.partido_id] = { gl: payload.new.goles_local, gv: payload.new.goles_vis, gol: payload.new.goleadores||'', tar: payload.new.tarjetas||'' };
-    renderAll();
-  })
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, payload => {
-    if (!payload.new) return;
-    const updated = payload.new;
-    // Actualizar en MATCHES
-    const idx = MATCHES.findIndex(m => m.id === updated.id);
-    if (idx !== -1) MATCHES[idx] = { ...MATCHES[idx], ...updated };
-    else MATCHES.push(updated);
-    // Actualizar en BRACKET_MATCHES
-    const bidx = BRACKET_MATCHES.findIndex(m => m.id === updated.id);
-    if (bidx !== -1) BRACKET_MATCHES[bidx] = { ...BRACKET_MATCHES[bidx], ...updated };
-    // Re-render según tab activo
-    const active = document.querySelector('.view.on')?.id?.replace('view-','');
-    if (active === 'bracket') renderBracket();
-    else renderAll();
-  })
-  .subscribe();
+// ── REALTIME con auto-reconexión ───────────────────────────────
+let _dashCh = null, _dashChN = 0;
+function setupRealtimeDash() {
+  if (_dashCh) try { sb.removeChannel(_dashCh); } catch {}
+  _dashCh = sb.channel('dash-live-' + (++_dashChN))
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, payload => {
+      if (payload.new) RESULTADOS[payload.new.partido_id] = {
+        gl: payload.new.goles_local, gv: payload.new.goles_vis,
+        gol: payload.new.goleadores||'', tar: payload.new.tarjetas||''
+      };
+      renderAll();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'partidos' }, payload => {
+      if (!payload.new) return;
+      const u = payload.new;
+      const idx = MATCHES.findIndex(m => m.id === u.id);
+      if (idx !== -1) MATCHES[idx] = { ...MATCHES[idx], ...u };
+      const bidx = BRACKET_MATCHES.findIndex(m => m.id === u.id);
+      if (bidx !== -1) BRACKET_MATCHES[bidx] = { ...BRACKET_MATCHES[bidx], ...u };
+      const active = document.querySelector('.view.on')?.id?.replace('view-','');
+      if (active === 'bracket') renderBracket(); else renderAll();
+    })
+    .subscribe(status => {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        setTimeout(setupRealtimeDash, 5000);
+      }
+    });
+}
+setupRealtimeDash();
 
-// Polling directo al servidor cada 30s — redundancia si Realtime falla o ESPN tarda
+// ── POLLING cada 30s — fallback si Realtime falla ────────────────
 async function pollLive() {
   try {
     const r = await fetch('/api/live');
     if (!r.ok) return;
-    const { resultados = [] } = await r.json();
+    const { resultados = [], partidos: knockoutPartidos = [] } = await r.json();
+
     let changed = false;
+
+    // Sync resultados
     resultados.forEach(row => {
       const cur = RESULTADOS[row.partido_id];
-      const gl = row.goles_local, gv = row.goles_vis, gol = row.goleadores || '', tar = row.tarjetas || '';
-      if (!cur || cur.gl !== gl || cur.gv !== gv || cur.gol !== gol || cur.tar !== tar) {
+      const gl = row.goles_local, gv = row.goles_vis, gol = row.goleadores||'', tar = row.tarjetas||'';
+      if (!cur || cur.gl!==gl || cur.gv!==gv || cur.gol!==gol || cur.tar!==tar) {
         RESULTADOS[row.partido_id] = { gl, gv, gol, tar };
         changed = true;
       }
     });
-    if (changed) renderAll();
+
+    // Sync partidos de eliminatorias (nombres de equipos que avanzan)
+    knockoutPartidos.forEach(p => {
+      const idx = MATCHES.findIndex(m => m.id === p.id);
+      if (idx !== -1) {
+        if (MATCHES[idx].local !== p.local || MATCHES[idx].visitante !== p.visitante ||
+            MATCHES[idx].codigo_local !== p.codigo_local || MATCHES[idx].codigo_vis !== p.codigo_vis) {
+          MATCHES[idx] = { ...MATCHES[idx], ...p };
+          changed = true;
+        }
+      }
+      const bidx = BRACKET_MATCHES.findIndex(m => m.id === p.id);
+      if (bidx !== -1) {
+        BRACKET_MATCHES[bidx] = { ...BRACKET_MATCHES[bidx], ...p };
+      }
+    });
+
+    if (changed) {
+      const active = document.querySelector('.view.on')?.id?.replace('view-','');
+      if (active === 'bracket') renderBracket(); else renderAll();
+    }
   } catch {}
 }
 setInterval(pollLive, 30_000);
-
-// Polling del bracket cada 2 minutos cuando está activo
-setInterval(() => {
-  const active = document.querySelector('.view.on')?.id?.replace('view-','');
-  if (active === 'bracket') loadBracket();
-}, 120_000);
 
 init();
 </script>

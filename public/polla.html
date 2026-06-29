@@ -871,8 +871,10 @@ async function pollLive() {
   try {
     const r = await fetch('/api/live');
     if (!r.ok) return;
-    const { resultados = [], ts } = await r.json();
+    const { resultados = [], partidos: knockoutPartidos = [], ts } = await r.json();
     let changed = false;
+
+    // Sync resultados
     resultados.forEach(row => {
       const cur = RESULTADOS[row.partido_id];
       const gl = row.goles_local, gv = row.goles_vis, gol = row.goleadores || '', tar = row.tarjetas || '';
@@ -881,6 +883,17 @@ async function pollLive() {
         changed = true;
       }
     });
+
+    // Sync partidos de eliminatorias (nombres de equipos que avanzan)
+    knockoutPartidos.forEach(p => {
+      const idx = MATCHES.findIndex(m => m.id === p.id);
+      if (idx !== -1 && (MATCHES[idx].local !== p.local || MATCHES[idx].visitante !== p.visitante ||
+          MATCHES[idx].codigo_local !== p.codigo_local || MATCHES[idx].codigo_vis !== p.codigo_vis)) {
+        MATCHES[idx] = { ...MATCHES[idx], ...p };
+        changed = true;
+      }
+    });
+
     if (changed) {
       if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
       if (document.querySelector('[data-tab="resultados"].on')) renderRes();
@@ -1182,10 +1195,7 @@ function setupRealtimePartidos() {
       if (!payload.new) return;
       const updated = payload.new;
       const idx = MATCHES.findIndex(m => m.id === updated.id);
-      if (idx !== -1) {
-        MATCHES[idx] = { ...MATCHES[idx], ...updated };
-      }
-      // Re-renderizar la vista activa para mostrar los nuevos nombres de equipos
+      if (idx !== -1) MATCHES[idx] = { ...MATCHES[idx], ...updated };
       const activeTab = document.querySelector('nav button.on')?.dataset?.tab;
       if (activeTab === 'apuestas') renderBets();
       else if (activeTab === 'resultados') renderRes();
@@ -1194,6 +1204,9 @@ function setupRealtimePartidos() {
     .subscribe((status) => {
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
         setTimeout(setupRealtimePartidos, 5000);
+      } else if (status === 'SUBSCRIBED') {
+        // Al reconectar, re-fetch partidos de eliminatorias por si hubo cambios mientras offline
+        pollLive();
       }
     });
 }
