@@ -404,7 +404,7 @@ async function init() {
   MATCHES = partidos || [];
   RESULTADOS = {};
   (resultados || []).forEach(r => {
-    RESULTADOS[r.partido_id] = { gl: r.goles_local, gv: r.goles_vis, gol: r.goleadores || '', tar: r.tarjetas || '' };
+    RESULTADOS[r.partido_id] = { gl: r.goles_local, gv: r.goles_vis, gol: r.goleadores || '', tar: r.tarjetas || '', penL: r.penales_local, penV: r.penales_vis };
   });
 
   const etapas = [...new Set(MATCHES.map(m => m.etapa))];
@@ -471,7 +471,7 @@ function renderRes() {
   const list = MATCHES.filter(m => !st || m.etapa === st);
 
   $('resGrid').innerHTML = list.map(m => {
-    const r = RESULTADOS[m.id] || { gl: '', gv: '', gol: '', tar: '' };
+    const r = RESULTADOS[m.id] || { gl: '', gv: '', gol: '', tar: '', penL: null, penV: null };
     const saved = r.gl != null && r.gl !== '';
     const status = matchStatus(m);
     const isLive = status === 'live';
@@ -491,6 +491,15 @@ function renderRes() {
           value="${r.gv != null && r.gv !== '' ? r.gv : ''}" data-m="${m.id}" data-s="gv">
         <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis, m.visitante)}</div>
       </div>
+      ${m.id >= 73 ? `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,17,102,.1);font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey)">
+        <span style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;font-size:9px;color:var(--nodo);flex:none">Penales</span>
+        <input type="number" min="0" max="20" style="width:48px" placeholder="L"
+          value="${r.penL != null ? r.penL : ''}" data-m="${m.id}" data-s="penL" title="${m.local} (penales)">
+        <span>–</span>
+        <input type="number" min="0" max="20" style="width:48px" placeholder="V"
+          value="${r.penV != null ? r.penV : ''}" data-m="${m.id}" data-s="penV" title="${m.visitante} (penales)">
+        <span style="font-size:9px;opacity:.6">(solo si hubo tiempo extra)</span>
+      </div>` : ''}
       <div class="gol-builder">
         <div class="section-sep">⚽ Goles</div>
         <div class="gol-rows" id="gol-rows-${m.id}">
@@ -516,7 +525,7 @@ function onResInput(e) {
   const mid = +inp.dataset.m;
   if (inp.dataset.s === 'gol-part')  { triggerGolSave(mid);  return; }
   if (inp.dataset.s === 'card-part') { triggerCardSave(mid); return; }
-  RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null, gol: '', tar: '' };
+  RESULTADOS[mid] = RESULTADOS[mid] || { gl: null, gv: null, gol: '', tar: '', penL: null, penV: null };
   RESULTADOS[mid][inp.dataset.s] = inp.value !== '' ? +inp.value : null;
   const card = document.getElementById('res-' + mid);
   if (card) card.classList.add('saving');
@@ -529,14 +538,17 @@ $('resGrid').addEventListener('change', onResInput);
 async function saveResultado(mid) {
   const r = RESULTADOS[mid];
   if (r.gl == null || r.gv == null) return;
-  await sb.from('resultados').upsert({
+  const body = {
     partido_id: mid,
     goles_local: r.gl,
     goles_vis: r.gv,
     goleadores: r.gol || '',
     tarjetas:   r.tar || '',
     updated_at: new Date().toISOString()
-  }, { onConflict: 'partido_id' });
+  };
+  if (r.penL != null) body.penales_local = r.penL;
+  if (r.penV != null) body.penales_vis   = r.penV;
+  await sb.from('resultados').upsert(body, { onConflict: 'partido_id' });
   const card = document.getElementById('res-' + mid);
   if (card) { card.classList.remove('saving'); card.classList.add('saved'); }
 }

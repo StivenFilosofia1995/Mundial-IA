@@ -95,6 +95,14 @@ input[type="number"],input[type="text"],select{font-family:'Spline Sans Mono',mo
 .result-bar.acierto{background:var(--nodo);color:var(--blanco)}
 .result-bar.fallado{background:#eff0f4;color:var(--grey)}
 .res-official{font-family:'Spline Sans Mono',monospace;font-size:9px;color:var(--grey);padding:5px 10px;border-top:1px solid rgba(0,17,102,.08)}
+.pen-row{margin-top:8px;border-top:1px solid rgba(0,17,102,.1);padding-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pen-label{font-family:'Spline Sans Mono',monospace;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--nodo);flex:none}
+.pen-btn{font-family:'Spline Sans Mono',monospace;font-size:10px;font-weight:700;border:2px solid var(--nodo);background:var(--card);color:var(--nodo);padding:4px 10px;cursor:pointer;flex:1;min-width:60px;max-width:120px;transition:all .1s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pen-btn:hover:not([disabled]){background:var(--paper)}
+.pen-btn.active{background:var(--nodo);color:var(--blanco)}
+.pen-btn.pen-ok{background:#dcfce7;border-color:#16a34a;color:#15803d}
+.pen-btn.pen-err{background:#fee2e2;border-color:#dc2626;color:#dc2626;text-decoration:line-through;opacity:.7}
+.pen-btn[disabled]{opacity:.45;cursor:default}
 .summary-bar{grid-column:1/-1;background:var(--nodo);color:var(--blanco);padding:13px 16px;display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-family:'Spline Sans Mono',monospace;font-size:11px;border-left:5px solid var(--amarillo)}
 .summary-bar b{color:var(--amarillo)}
 /* TABLA */
@@ -313,9 +321,14 @@ let MATCHES = [], RESULTADOS = {}, APUESTAS_CACHE = {};
 function points(bet, res) {
   if (!bet||!res||bet.gl==null||bet.gv==null) return null;
   const bh=+bet.gl,ba=+bet.gv,rh=+res.gl,ra=+res.gv;
-  if (bh===rh&&ba===ra) return 3;
-  if (Math.sign(bh-ba)===Math.sign(rh-ra)) return 1;
-  return 0;
+  let pts;
+  if (bh===rh&&ba===ra) pts=3;
+  else if (Math.sign(bh-ba)===Math.sign(rh-ra)) pts=1;
+  else pts=0;
+  if (rh===ra && res.penLocal!=null && res.penVis!=null && res.penLocal!==res.penVis && bet.pg) {
+    if (bet.pg===(res.penLocal>res.penVis?'L':'V')) pts+=1;
+  }
+  return pts;
 }
 
 function calcPesos(bet, res) {
@@ -328,7 +341,12 @@ function calcPesos(bet, res) {
   if (resultOk) pesos += 1000;
   if (localOk)  pesos += 500;
   if (visOk)    pesos += 500;
-  return { pesos, resultOk, localOk, visOk };
+  let penOk = false;
+  if (rh===ra && res.penLocal!=null && res.penVis!=null && res.penLocal!==res.penVis && bet.pg) {
+    penOk = bet.pg===(res.penLocal>res.penVis?'L':'V');
+    if (penOk) pesos += 500;
+  }
+  return { pesos, resultOk, localOk, visOk, penOk };
 }
 
 function buildResultBar(bet, res, localName, visName) {
@@ -337,25 +355,33 @@ function buildResultBar(bet, res, localName, visName) {
   const p  = points(bet, res);
   const cp = calcPesos(bet, res);
   if (!cp) return '';
-  const pLabel = p===3 ? '⭐ EXACTO' : p===1 ? '✓ ACIERTO' : '✗ FALLADO';
-  const cls    = p===3 ? 'exacto'   : p===1 ? 'acierto'   : 'fallado';
+  const rh=+res.gl, ra=+res.gv, bh=+bet.gl, ba=+bet.gv;
+  const baseP = bh===rh&&ba===ra ? 3 : Math.sign(bh-ba)===Math.sign(rh-ra) ? 1 : 0;
+  const hasPen = rh===ra && res.penLocal!=null && res.penVis!=null && res.penLocal!==res.penVis;
+  const penWin = hasPen ? (res.penLocal>res.penVis?'L':'V') : null;
+  const pLabel = baseP===3 ? '⭐ EXACTO' : baseP===1 ? '✓ ACIERTO' : '✗ FALLADO';
+  const cls    = baseP===3 ? 'exacto'   : baseP===1 ? 'acierto'   : 'fallado';
   const ln = (localName||'L').split(' ')[0].slice(0,8);
   const vn = (visName||'V').split(' ')[0].slice(0,8);
   const chip = (ok, label, val) => ok
     ? `<span class="calc-chip ok">${label} +${fmtPesos(val)}</span>`
     : `<span class="calc-chip no">${label}</span>`;
+  const penWinName = hasPen ? (penWin==='L' ? (localName||'L') : (visName||'V')) : '';
+  const penChip = hasPen ? chip(cp.penOk, `pen ${penWinName.split(' ')[0].slice(0,7)}`, 500) : '';
   return `<div class="result-bar ${cls}">
-      <span>${pLabel}</span>
+      <span>${pLabel}${hasPen&&cp.penOk?' +PEN':''}</span>
       <span>${p} PT${p!==1?'S':''} · ${fmtPesos(cp.pesos)}</span>
     </div>
     <div class="calc-row">
       ${chip(cp.resultOk,'resultado',1000)}
       ${chip(cp.localOk,'gol '+ln,500)}
       ${chip(cp.visOk,'gol '+vn,500)}
+      ${penChip}
     </div>
     <div class="res-official">
       Tu apuesta: <b>${bet.gl}–${bet.gv}</b>
       &nbsp;·&nbsp; Oficial: <b>${res.gl}–${res.gv}</b>
+      ${hasPen ? `&nbsp;·&nbsp; Pen: <b>${penWinName}</b> gana` : ''}
     </div>
     ${buildGoalsHtml(res.gol, res.tar, localName, visName) || `<div class="goleadores-pending">⏳ Cargando detalle de goles…</div>`}`;
 }
@@ -452,9 +478,9 @@ async function init() {
 
   MATCHES = partidos || [];
   RESULTADOS = {};
-  (resultados||[]).forEach(r => { RESULTADOS[r.partido_id] = { gl: r.goles_local, gv: r.goles_vis, gol: r.goleadores||'', tar: r.tarjetas||'' }; });
+  (resultados||[]).forEach(r => { RESULTADOS[r.partido_id] = { gl: r.goles_local, gv: r.goles_vis, gol: r.goleadores||'', tar: r.tarjetas||'', penLocal: r.penales_local, penVis: r.penales_vis }; });
   APUESTAS_CACHE = {};
-  (apuestas||[]).forEach(a => { APUESTAS_CACHE[a.partido_id] = { gl: a.goles_local, gv: a.goles_vis }; });
+  (apuestas||[]).forEach(a => { APUESTAS_CACHE[a.partido_id] = { gl: a.goles_local, gv: a.goles_vis, pg: a.penal_ganador||null }; });
 
   const etapas = [...new Set(MATCHES.map(m => m.etapa))];
   $('betStage').innerHTML = '<option value="">TODAS LAS FASES</option>' +
@@ -497,7 +523,7 @@ function renderBets() {
   const cards = list.map(m => {
     const lock = betLocked(m);   // cerrado si es hoy o ya pasó
     const live = isLive(m);
-    const bet  = APUESTAS_CACHE[m.id] || { gl: '', gv: '' };
+    const bet  = APUESTAS_CACHE[m.id] || { gl: '', gv: '', pg: null };
     const res  = RESULTADOS[m.id];
     const p    = res ? points(bet, res) : null;
 
@@ -519,6 +545,16 @@ function renderBets() {
         ${live ? '<div class="live-strip"></div>' : ''}`;
     }
 
+    const hasPenRes = res && +res.gl === +res.gv && res.penLocal != null && res.penVis != null;
+    const penWin = hasPenRes ? (res.penLocal > res.penVis ? 'L' : 'V') : null;
+    const penBtnL = 'pen-btn' + (bet.pg==='L' ? (hasPenRes ? (penWin==='L'?' pen-ok':' pen-err') : ' active') : '');
+    const penBtnV = 'pen-btn' + (bet.pg==='V' ? (hasPenRes ? (penWin==='V'?' pen-ok':' pen-err') : ' active') : '');
+    const penRow = m.id >= 73 ? `
+      <div class="pen-row">
+        <span class="pen-label">¿Pen?</span>
+        <button class="${penBtnL}" data-m="${m.id}" data-pg="L"${lock?' disabled':''}>${m.local.split(' ')[0].slice(0,10)}</button>
+        <button class="${penBtnV}" data-m="${m.id}" data-pg="V"${lock?' disabled':''}>${m.visitante.split(' ')[0].slice(0,10)}</button>
+      </div>` : '';
     return `<div class="bet-card ${live?'saving':lock?'locked':''}" id="card-${m.id}">
       <div class="bet-top">
         <span class="stage">${m.etapa}</span>
@@ -536,6 +572,7 @@ function renderBets() {
           data-m="${m.id}" data-s="gv">
         <div class="bt right"><span>${m.visitante}</span>${flag(m.codigo_vis,m.visitante)}</div>
       </div>
+      ${penRow}
       ${bottomHtml}
     </div>`;
   }).join('') || '<div class="loading">Sin partidos en esta fase.</div>';
@@ -550,7 +587,7 @@ $('betsGrid').addEventListener('input', e => {
   // Bloqueo 1: rechazar si el partido es hoy o pasado (protege contra manipulación de DOM)
   const m = MATCHES.find(x => x.id === mid);
   if (m && betLocked(m)) { inp.value = APUESTAS_CACHE[mid]?.[inp.dataset.s] ?? ''; return; }
-  APUESTAS_CACHE[mid] = APUESTAS_CACHE[mid] || { gl: null, gv: null };
+  APUESTAS_CACHE[mid] = APUESTAS_CACHE[mid] || { gl: null, gv: null, pg: null };
   APUESTAS_CACHE[mid][inp.dataset.s] = inp.value !== '' ? +inp.value : null;
   const card = document.getElementById('card-'+mid);
   if (card) card.classList.add('saving');
@@ -558,15 +595,38 @@ $('betsGrid').addEventListener('input', e => {
   saveTimers[mid] = setTimeout(() => saveApuesta(mid), 600);
 });
 
+$('betsGrid').addEventListener('click', e => {
+  const btn = e.target.closest('.pen-btn');
+  if (!btn || !btn.dataset.m || btn.disabled) return;
+  const mid = +btn.dataset.m;
+  const m = MATCHES.find(x => x.id === mid);
+  if (!m || betLocked(m)) return;
+  APUESTAS_CACHE[mid] = APUESTAS_CACHE[mid] || { gl: null, gv: null, pg: null };
+  const prev = APUESTAS_CACHE[mid].pg;
+  APUESTAS_CACHE[mid].pg = prev === btn.dataset.pg ? null : btn.dataset.pg;
+  // Actualizar clases de botones sin re-renderizar toda la tarjeta
+  const card = document.getElementById('card-'+mid);
+  if (card) {
+    card.querySelectorAll('.pen-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.pg === APUESTAS_CACHE[mid].pg);
+    });
+    card.classList.add('saving');
+  }
+  clearTimeout(saveTimers[mid]);
+  saveTimers[mid] = setTimeout(() => saveApuesta(mid), 600);
+});
+
 async function saveApuesta(mid) {
   const bet = APUESTAS_CACHE[mid];
-  if (bet.gl == null || bet.gv == null) return;
+  // Nada que guardar si no hay scores ni predicción de penales
+  if ((bet.gl == null || bet.gv == null) && bet.pg == null) return;
   // Bloqueo 2 (definitivo): si el partido es hoy o pasado, no guardar bajo ninguna circunstancia
   const m = MATCHES.find(x => x.id === mid);
   if (!m || betLocked(m)) return;
   await sb.from('apuestas').upsert({
     usuario_id: sesion.id, partido_id: mid,
-    goles_local: bet.gl, goles_vis: bet.gv,
+    goles_local: bet.gl ?? null, goles_vis: bet.gv ?? null,
+    penal_ganador: bet.pg || null,
     updated_at: new Date().toISOString()
   }, { onConflict: 'usuario_id,partido_id' });
   const card = document.getElementById('card-'+mid);
@@ -581,7 +641,7 @@ window.saveAllApuestas = async () => {
   // Solo guarda partidos que NO han comenzado
   const jobs = Object.entries(APUESTAS_CACHE)
     .filter(([mid, b]) => {
-      if (b.gl == null || b.gv == null) return false;
+      if ((b.gl == null || b.gv == null) && b.pg == null) return false;
       const m = MATCHES.find(x => x.id === +mid);
       return m && !betLocked(m);
     })
@@ -836,7 +896,7 @@ function setupRealtimeResultados() {
   if (_rtRes) try { sb.removeChannel(_rtRes); } catch {}
   _rtRes = sb.channel('res-live-' + (++_rtResN))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'resultados' }, payload => {
-      if (payload.new) RESULTADOS[payload.new.partido_id] = { gl: payload.new.goles_local, gv: payload.new.goles_vis, gol: payload.new.goleadores||'', tar: payload.new.tarjetas||'' };
+      if (payload.new) RESULTADOS[payload.new.partido_id] = { gl: payload.new.goles_local, gv: payload.new.goles_vis, gol: payload.new.goleadores||'', tar: payload.new.tarjetas||'', penLocal: payload.new.penales_local, penVis: payload.new.penales_vis };
       if (payload.eventType === 'DELETE' && payload.old) delete RESULTADOS[payload.old.partido_id];
       if (document.querySelector('[data-tab="apuestas"].on')) renderBets();
       if (document.querySelector('[data-tab="resultados"].on')) renderRes();
@@ -878,8 +938,9 @@ async function pollLive() {
     resultados.forEach(row => {
       const cur = RESULTADOS[row.partido_id];
       const gl = row.goles_local, gv = row.goles_vis, gol = row.goleadores || '', tar = row.tarjetas || '';
-      if (!cur || cur.gl !== gl || cur.gv !== gv || cur.gol !== gol || cur.tar !== tar) {
-        RESULTADOS[row.partido_id] = { gl, gv, gol, tar };
+      const penLocal = row.penales_local ?? null, penVis = row.penales_vis ?? null;
+      if (!cur || cur.gl !== gl || cur.gv !== gv || cur.gol !== gol || cur.tar !== tar || cur.penLocal !== penLocal || cur.penVis !== penVis) {
+        RESULTADOS[row.partido_id] = { gl, gv, gol, tar, penLocal, penVis };
         changed = true;
       }
     });

@@ -88,7 +88,7 @@ async function findPartidoId(localEs, visEs) {
   return data?.[0]?.id ?? null;
 }
 
-async function upsertResultado(pid, gl, gv, goleadores, tarjetas = '') {
+async function upsertResultado(pid, gl, gv, goleadores, tarjetas = '', penLocal = null, penVis = null) {
   if (gl == null || gv == null) return;
   const body = {
     partido_id: pid, goles_local: gl, goles_vis: gv,
@@ -96,6 +96,8 @@ async function upsertResultado(pid, gl, gv, goleadores, tarjetas = '') {
   };
   if (goleadores) body.goleadores = goleadores;
   if (tarjetas)   body.tarjetas   = tarjetas;
+  if (penLocal != null) body.penales_local = penLocal;
+  if (penVis   != null) body.penales_vis   = penVis;
   // on_conflict=partido_id: usa la restricción UNIQUE de partido_id (no el PK auto id)
   const r = await sbRest('/resultados?on_conflict=partido_id', 'POST', [body]);
   if (r === null) console.error(`[db] upsert falló: partido=${pid} gol="${goleadores}" tar="${tarjetas}"`);
@@ -460,7 +462,7 @@ async function computeAndUpdateBracket() {
   try {
     const [allPartidos, allResultados] = await Promise.all([
       sbRest('/partidos?select=id,etapa,local,visitante,codigo_local,codigo_vis&order=id'),
-      sbRest('/resultados?select=partido_id,goles_local,goles_vis'),
+      sbRest('/resultados?select=partido_id,goles_local,goles_vis,penales_local,penales_vis'),
     ]);
     if (!allPartidos || !allResultados) return;
 
@@ -537,8 +539,15 @@ async function computeAndUpdateBracket() {
     const getWL = (fromId, wl) => {
       const partido = byId[fromId]; const res = resMap[fromId];
       if (!partido || !res) return null;
-      if (res.goles_local === res.goles_vis) return null; // empate: no resolver (necesita penales)
-      const localGana = res.goles_local > res.goles_vis;
+      let localGana;
+      if (res.goles_local === res.goles_vis) {
+        // Empate en tiempo reglamentario: resolver con penales si están registrados
+        if (res.penales_local == null || res.penales_vis == null) return null;
+        if (res.penales_local === res.penales_vis) return null; // penales también empatados (no debería pasar)
+        localGana = res.penales_local > res.penales_vis;
+      } else {
+        localGana = res.goles_local > res.goles_vis;
+      }
       const takeLocal = wl === 'W' ? localGana : !localGana;
       return { nombre: takeLocal ? partido.local : partido.visitante, codigo: takeLocal ? partido.codigo_local : partido.codigo_vis };
     };
@@ -721,7 +730,7 @@ app.get('/api/debug-goals', async (req, res) => {
 // Marcadores actuales (polling de clientes cada 30s)
 app.get('/api/live', async (req, res) => {
   const [resultados, knockoutPartidos] = await Promise.all([
-    sbRest('/resultados?select=partido_id,goles_local,goles_vis,goleadores,tarjetas,updated_at'),
+    sbRest('/resultados?select=partido_id,goles_local,goles_vis,penales_local,penales_vis,goleadores,tarjetas,updated_at'),
     sbRest('/partidos?id=gte.73&select=id,local,visitante,codigo_local,codigo_vis&order=id'),
   ]);
   res.json({ ok: true, ts: Date.now(), resultados: resultados || [], partidos: knockoutPartidos || [] });
