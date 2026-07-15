@@ -208,6 +208,10 @@ footer{background:var(--nodo);color:rgba(255,255,255,.4);padding:14px 4vw;font-f
         <span style="font-family:'Spline Sans Mono',monospace;font-size:10px;color:var(--grey)">Selecciona los equipos clasificados y confirma — los usuarios reciben puntos automáticamente</span>
       </div>
       <p class="note">SELECCIONA LOS EQUIPOS QUE CLASIFICARON REALMENTE · GUARDA Y CONFIRMA POR FASE · SOLO CONFIRMADAS DAN PUNTOS</p>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button class="btn" style="font-size:10px;padding:5px 12px" onclick="verificarConsistenciaFases()">🔍 Verificar consistencia con resultados reales</button>
+      </div>
+      <div id="bracketDiag"></div>
       <div id="bracketAdmin"><div class="loading">Cargando…</div></div>
     </div>
   </main>
@@ -682,7 +686,103 @@ async function loadBracketAdmin() {
   ADMIN_BRACKET = {};
   (data || []).forEach(r => { ADMIN_BRACKET[r.fase] = { equipos: new Set(r.equipos || []), confirmado: r.confirmado }; });
   renderBracketAdmin();
+  verificarConsistenciaFases();
 }
+
+// ── Verificación automática contra resultados reales ──────────────
+// Detecta contradicciones como "Noruega" apareciendo clasificada a semis
+// estando en realidad eliminada en cuartos: en vez de confiar solo en los
+// checkboxes marcados a mano, esto recalcula quién llegó REALMENTE a cada
+// fase leyendo los partidos ya resueltos por el sistema automático
+// (sync de ESPN + computeAndUpdateBracket en server.js).
+const PHASE_MATCH_IDS = {
+  dieciseisavos: [73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88],
+  octavos:       [89,90,91,92,93,94,95,96],
+  cuartos:       [97,98,99,100],
+  semis:         [101,102],
+  finalistas:    [104],
+  campeon:       [104],
+};
+const isPlaceholderTeam = n => !n || /^[12][A-L]$/.test(n) || /^Mejor 3°/.test(n) || /^Ganador P/.test(n) || /^Perdedor P/.test(n);
+
+async function deriveFaseReal(faseId) {
+  const fase = BRACKET_FASES.find(f => f.id === faseId);
+  const ids  = PHASE_MATCH_IDS[faseId];
+  if (!fase || !ids) return null;
+
+  const { data: partidos } = await sb.from('partidos').select('id,local,visitante').in('id', ids);
+  if (!partidos || !partidos.length) return null;
+
+  if (faseId === 'campeon') {
+    const p = partidos.find(x => x.id === 104);
+    if (!p) return null;
+    const { data: res } = await sb.from('resultados').select('*').eq('partido_id', 104).maybeSingle();
+    if (!res) return null; // final aún no jugada
+    let localGana;
+    if (res.goles_local === res.goles_vis) {
+      if (res.penales_local == null || res.penales_vis == null) return null;
+      localGana = res.penales_local > res.penales_vis;
+    } else {
+      localGana = res.goles_local > res.goles_vis;
+    }
+    const campeon = localGana ? p.local : p.visitante;
+    return isPlaceholderTeam(campeon) ? null : [campeon];
+  }
+
+  const teams = new Set();
+  for (const p of partidos) {
+    if (!isPlaceholderTeam(p.local)) teams.add(p.local);
+    if (!isPlaceholderTeam(p.visitante)) teams.add(p.visitante);
+  }
+  const arr = Array.from(teams).sort();
+  return arr.length === fase.count ? arr : null; // null = aún no están resueltos todos los partidos de esta fase
+}
+
+async function verificarConsistenciaFases() {
+  const con = document.getElementById('bracketDiag');
+  if (!con) return;
+  con.innerHTML = '<div class="loading">Verificando…</div>';
+
+  const rows = [];
+  for (const fase of BRACKET_FASES) {
+    const real  = await deriveFaseReal(fase.id);
+    const state = ADMIN_BRACKET[fase.id] || { equipos: new Set(), confirmado: false };
+    const saved = Array.from(state.equipos).sort();
+    if (!real) { rows.push({ fase, real: null }); continue; }
+    const faltan = real.filter(t => !saved.includes(t));
+    const sobran = saved.filter(t => !real.includes(t));
+    rows.push({ fase, real, faltan, sobran, ok: faltan.length === 0 && sobran.length === 0 });
+  }
+
+  const problemas = rows.filter(r => r.real && !r.ok);
+
+  con.innerHTML = `
+    <div style="background:var(--card);border:2px solid ${problemas.length ? 'var(--rojo)' : '#16a34a'};box-shadow:3px 3px 0 ${problemas.length ? 'var(--rojo)' : '#16a34a'};margin-bottom:16px;padding:12px 14px">
+      <div style="font-family:'Archivo Black',sans-serif;font-size:13px;color:${problemas.length ? 'var(--rojo)' : '#16a34a'};margin-bottom:6px">
+        ${problemas.length ? `⚠️ ${problemas.length} fase(s) no coinciden con los resultados reales` : '✅ Todas las fases coinciden con los resultados reales'}
+      </div>
+      ${rows.map(r => {
+        if (!r.real) return `<div style="font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--grey);padding:3px 0">· ${r.fase.label}: aún no hay ${r.fase.count} equipo${r.fase.count>1?'s':''} resuelto${r.fase.count>1?'s':''} automáticamente.</div>`;
+        if (r.ok) return `<div style="font-family:'Spline Sans Mono',monospace;font-size:11px;color:#16a34a;padding:3px 0">✓ ${r.fase.label}: coincide.</div>`;
+        return `<div style="font-family:'Spline Sans Mono',monospace;font-size:11px;color:var(--rojo);padding:5px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <span>⚠️ ${r.fase.label}: ${r.sobran.length ? 'quitar ' + r.sobran.join(', ') : ''}${r.sobran.length && r.faltan.length ? ' · ' : ''}${r.faltan.length ? 'agregar ' + r.faltan.join(', ') : ''}</span>
+          <button class="btn danger" style="font-size:10px;padding:3px 10px" onclick="aplicarFaseReal('${r.fase.id}')">✓ Corregir con resultados reales</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+window.aplicarFaseReal = async (faseId) => {
+  const real = await deriveFaseReal(faseId);
+  if (!real) { alert('Aún no hay suficientes resultados confirmados para esta fase.'); return; }
+  if (!confirm(`Se reemplazarán los equipos de "${faseId}" por los reales:\n${real.join(', ')}\n\n¿Confirmar y dar puntos ahora?`)) return;
+  const { error } = await sb.from('resultados_fase').upsert(
+    { fase: faseId, equipos: real, confirmado: true, updated_at: new Date().toISOString() },
+    { onConflict: 'fase' }
+  );
+  if (error) { alert('Error: ' + error.message); return; }
+  await loadBracketAdmin();
+};
 
 function renderBracketAdmin() {
   const con = document.getElementById('bracketAdmin');
