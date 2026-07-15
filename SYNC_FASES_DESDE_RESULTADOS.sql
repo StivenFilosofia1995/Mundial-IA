@@ -17,6 +17,18 @@
 -- es seguro correrlo varias veces mientras avanza el torneo.
 -- ============================================================
 
+-- ── (0) SEMIFINAL 1 — Francia 0-2 España (Dallas, 14 jul 2026) ──
+-- Salvaguarda por si el sync automático de ESPN no la tomó bien:
+-- España avanzó a la final con goles de Oyarzabal (pen) y Porro.
+-- Si el resultado ya estaba cargado correctamente esto no cambia
+-- nada (mismo marcador); si faltaba o estaba mal, lo corrige.
+INSERT INTO resultados (partido_id, goles_local, goles_vis, goleadores) VALUES
+(101, 0, 2, 'España: Oyarzabal (pen), Porro')
+ON CONFLICT (partido_id) DO UPDATE
+  SET goles_local = EXCLUDED.goles_local,
+      goles_vis   = EXCLUDED.goles_vis,
+      updated_at  = NOW();
+
 -- ── CUARTOS DE FINAL (8 equipos: partidos 97-100) ──────────────
 WITH equipos AS (
   SELECT local AS team FROM partidos WHERE id IN (97,98,99,100)
